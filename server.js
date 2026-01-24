@@ -492,8 +492,8 @@ function inMemTokenBucket(key, now) {
 // Helper function to sanitize IP for use as Map keys
 function sanitizeIpForKey(ip) {
   if (!ip || ip === 'unknown' || ip === '') {
-    // Generate unique identifier for invalid IPs to prevent bucket collision
-    return `invalid_${Math.random().toString(36).substr(2, 8)}`;
+    // Use a stable key to avoid bucket bypass while grouping unknown IPs safely
+    return 'invalid_unknown';
   }
   
   // Basic IP format validation - if it looks like a valid IP, use it as-is
@@ -501,8 +501,8 @@ function sanitizeIpForKey(ip) {
     return ip;
   }
   
-  // For malformed IPs, create a sanitized key
-  return `malformed_${Buffer.from(ip).toString('base64url').slice(0, 16)}`;
+  // For malformed IPs, create a deterministic sanitized key
+  return `malformed_${crypto.createHash('sha256').update(String(ip)).digest('base64url').slice(0, 16)}`;
 }
 
 async function isRateLimited(ip) {

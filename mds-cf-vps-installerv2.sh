@@ -15,7 +15,7 @@ set -euo pipefail
 # =========================
 
 # ====== EDIT THESE (MINIMUM) ======
-BACKEND_URL="https://v42beta-beta-v.up.railway.app"
+BACKEND_URL="https://xxxx.railway.app"
 CF_API_TOKEN="${CF_API_TOKEN:-PUT_YOUR_NEW_TOKEN_HERE}"   # Prefer env var: export CF_API_TOKEN="..."
 # =================================
 
@@ -659,5 +659,6 @@ Usage:
   $0 apply"
     ;;
 esac
+
 
 main

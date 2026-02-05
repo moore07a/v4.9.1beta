@@ -52,43 +52,68 @@ console.log(`[PROXY] Trust proxy setting: ${trustProxy}`);
 
 const REQUIRE_CF_HEADERS = (process.env.REQUIRE_CF_HEADERS || "").toLowerCase() === "true";
 
-// ------------ Global security headers (CSP + PAT) ---------------
+// ------------ Enhanced Global Security Headers ---------------
 app.use((req, res, next) => {
-  // avoid caching challenge pages/tokens
+  // Generate a nonce for CSP
+  const cspNonce = crypto.randomBytes(16).toString('base64');
+  res.locals.cspNonce = cspNonce;
+  
+  // Avoid caching challenge pages/tokens
   res.setHeader("Cache-Control", "no-store");
-
+  
+  // Determine if secure connection
   const isSecure = req.secure || (req.headers["x-forwarded-proto"] || "").includes("https");
   if (isSecure) {
     res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   }
-
-  // Private Access Tokens (for Turnstile); scope it to Turnstile origins instead of wildcard
+  
+  // Private Access Tokens
   res.setHeader(
     "Permissions-Policy",
     'private-token=(self "https://challenges.cloudflare.com" "https://challenges.fed.cloudflare.com" "https://challenges-staging.cloudflare.com")'
   );
-
-  // Content Security Policy tailored for Turnstile
-  res.setHeader("Content-Security-Policy", [
+  
+  // Enhanced CSP with nonce support
+  const isChallengePage = req.path === '/challenge' || req.path === '/challenge-fragment';
+  const cspDirectives = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://challenges.fed.cloudflare.com https://challenges-staging.cloudflare.com",
-    "frame-src 'self' https://challenges.cloudflare.com https://challenges.fed.cloudflare.com https://challenges-staging.cloudflare.com https://*.cloudflare.com",
-    "style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://challenges.fed.cloudflare.com https://challenges-staging.cloudflare.com",
+    `script-src 'self' 'nonce-${cspNonce}' https://challenges.cloudflare.com https://challenges.fed.cloudflare.com https://challenges-staging.cloudflare.com ${isChallengePage ? "'unsafe-inline'" : ""}`,
+    "style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
     "img-src 'self' data: https:",
-    "connect-src 'self' https://challenges.cloudflare.com https://challenges.fed.cloudflare.com https://challenges-staging.cloudflare.com https://*.cloudflare.com",
-    "font-src 'self' data: https:",
-    "worker-src 'self' blob:",
-    // hardening
+    "connect-src 'self' https://challenges.cloudflare.com https://challenges.fed.cloudflare.com https://challenges-staging.cloudflare.com",
+    "font-src 'self' data:",
+    "frame-src 'self' https://challenges.cloudflare.com",
+    "worker-src 'none'",
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'self'",
-    "frame-ancestors 'self'"
-  ].join('; '));
-
-  // (optional but nice-to-have) extra headers
+    "frame-ancestors 'none'"
+  ];
+  
+  // Add report-uri in production
+  if (process.env.NODE_ENV === 'production' && process.env.CSP_REPORT_URI) {
+    cspDirectives.push(`report-uri ${process.env.CSP_REPORT_URI}`);
+    cspDirectives.push("report-to csp-endpoint");
+  }
+  
+  res.setHeader("Content-Security-Policy", cspDirectives.join('; '));
+  
+  // Additional security headers
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("X-Content-Type-Options", "nosniff");
-
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("X-DNS-Prefetch-Control", "off");
+  res.setHeader("X-Download-Options", "noopen");
+  
+  // Cross-origin headers
+  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  
+  // Remove powered-by header
+  res.removeHeader('X-Powered-By');
+  
   next();
 });
 
@@ -1533,7 +1558,7 @@ function renderScannerSafePage(req, res, nextEnc, reason = "Pre-scan", options =
 
   const stateInfo = markInterstitialShown(nextEnc);
   const challengeToken = createChallengeToken(nextEnc, req, mappedReason);
-  const nonce = crypto.randomBytes(16).toString("base64");
+  const nonce = res.locals.cspNonce || crypto.randomBytes(16).toString("base64");
 
   res.setHeader("Cache-Control", "no-store");
   try {
@@ -2531,7 +2556,7 @@ function resolveChallengeRequest(req, res) {
   };
 }
 
-function buildChallengeHtml(encryptedData) {
+function buildChallengeHtml(encryptedData, cspNonce = '') {
   return `<!doctype html><html><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -2574,7 +2599,7 @@ function buildChallengeHtml(encryptedData) {
   .err{ color:#ef4444; }
 </style>
 
-<script>
+<script nonce="${cspNonce}">
   const ENCRYPTED_DATA = ${JSON.stringify(encryptedData)};
   const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
   const TURNSTILE_SCRIPT_ID = "cf-turnstile-script";
@@ -2985,7 +3010,7 @@ app.get("/challenge", limitChallengeView, (req, res) => {
 <body>
 <noscript>Turnstile requires JavaScript. Please enable JS and refresh.</noscript>
 <script>
-  fetch("/challenge-fragment", {
+  <script nonce="${res.locals.cspNonce || ''}">
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
@@ -3024,7 +3049,7 @@ function handleChallengeFragment(req, res) {
   };
 
   const encryptedData = encryptChallengeData(challengePayload);
-  const htmlContent = buildChallengeHtml(encryptedData);
+  const htmlContent = buildChallengeHtml(encryptedData, res.locals.cspNonce);
 
   res.type("html").send(htmlContent);
 }

@@ -57,6 +57,11 @@ app.use((req, res, next) => {
   // avoid caching challenge pages/tokens
   res.setHeader("Cache-Control", "no-store");
 
+  const isSecure = req.secure || (req.headers["x-forwarded-proto"] || "").includes("https");
+  if (isSecure) {
+    res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
+
   // Private Access Tokens (for Turnstile); scope it to Turnstile origins instead of wildcard
   res.setHeader(
     "Permissions-Policy",

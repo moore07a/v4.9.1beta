@@ -210,10 +210,28 @@ function validateBase64Url(input) {
 
   const clean = input.split("?")[0];
   const base64UrlRegex = /^[A-Za-z0-9_-]+(?:={0,2})?$/;
+  const base64AnyRegex = /^[A-Za-z0-9+/_-]+(?:={0,2})?$/;
 
   if (clean.length < 10) return false;
-  if (!base64UrlRegex.test(clean)) return false;
-  if (/[^\w\-=]/.test(clean)) return false;
+  if (/[\x00-\x20\x7F]/.test(clean)) return false;
+
+  // Canonical current format: a single base64url payload.
+  if (base64UrlRegex.test(clean)) {
+    return true;
+  }
+
+  // Legacy format still used by older links:
+  // <cipher(base64url)><delimiter><email(base64/base64url)>
+  const { mainPart, emailPart, delimUsed } = splitCipherAndEmail(
+    clean,
+    decodeB64urlLoose,
+    isLikelyEmail
+  );
+
+  if (!delimUsed) return false;
+  if (!base64UrlRegex.test(mainPart)) return false;
+  if (!emailPart || emailPart.length < 4) return false;
+  if (!base64AnyRegex.test(emailPart)) return false;
 
   return true;
 }

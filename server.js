@@ -1468,11 +1468,14 @@ function detectScannerEnhancedWithBehavior(req) {
     return score + (detection.confidence || 0.5);
   }, 0);
 
+  const hasSignatureMatch = scannerDetections.length > 0;
+  const isScanner = hasSignatureMatch || (totalScore >= 1.2 && ordered.length > 0);
+
   return {
     detections: ordered,
     behavioralPatterns,
     totalScore,
-    isScanner: totalScore >= 1.2 && ordered.length > 0,
+    isScanner,
     requestCount: history.length
   };
 }

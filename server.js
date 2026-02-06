@@ -1298,6 +1298,185 @@ function hashUAForStats(uaRaw) {
   }
 }
 
+// ================== ENHANCED BEHAVIORAL SCANNER DETECTION ==================
+const BEHAVIORAL_CONFIG = {
+  historyTtlMs: 10 * 60 * 1000,
+  maxHistoryPerIp: 50,
+  maxIpsBeforeCleanup: 10000,
+  cleanupIntervalMs: 5 * 60 * 1000,
+  rapidFireWindowMs: 1000,
+  recentWindowMs: 5000,
+  minBehaviorScoreToFlag: 0.8
+};
+
+const BEHAVIORAL_PATTERNS = {
+  suspiciousTiming: () => {
+    const now = new Date();
+    const second = now.getSeconds();
+    const minute = now.getMinutes();
+
+    // Scanners often hit at exact intervals
+    return (second === 0 || second === 30) && (minute % 5 === 0);
+  },
+
+  headerAnomalies: (req) => {
+    const headers = req.headers;
+    const anomalies = [];
+
+    // Missing typical browser headers
+    if (!headers["accept-language"]) anomalies.push("no_accept_language");
+    if (!headers["accept-encoding"]) anomalies.push("no_accept_encoding");
+    if (headers["accept"] === "*/*") anomalies.push("wildcard_accept");
+
+    // Suspicious header combinations
+    if (headers["sec-fetch-site"] === "none" && !headers["referer"]) {
+      anomalies.push("no_referer_with_cross_site");
+    }
+    if (headers["sec-fetch-mode"] === "no-cors" && req.method === "GET") {
+      anomalies.push("no_cors_get");
+    }
+
+    return anomalies;
+  }
+};
+
+const REQUEST_HISTORY = new Map();
+
+function cleanupRequestHistory(now) {
+  for (const [key, entries] of REQUEST_HISTORY.entries()) {
+    if (!entries.length || now - entries[entries.length - 1].timestamp > BEHAVIORAL_CONFIG.historyTtlMs) {
+      REQUEST_HISTORY.delete(key);
+    }
+  }
+}
+
+if (BEHAVIORAL_CONFIG.cleanupIntervalMs > 0) {
+  const interval = setInterval(() => cleanupRequestHistory(Date.now()), BEHAVIORAL_CONFIG.cleanupIntervalMs);
+  if (typeof interval.unref === "function") interval.unref();
+}
+
+function trackRequestForBehavior(req) {
+  const ip = getClientIp(req);
+  const now = Date.now();
+
+  if (!REQUEST_HISTORY.has(ip)) {
+    REQUEST_HISTORY.set(ip, []);
+  }
+
+  const history = REQUEST_HISTORY.get(ip);
+  history.push({ timestamp: now, path: req.path, method: req.method });
+
+  // Clean old entries
+  const cutoff = now - BEHAVIORAL_CONFIG.historyTtlMs;
+  const freshHistory = history.filter((entry) => entry.timestamp > cutoff);
+  REQUEST_HISTORY.set(ip, freshHistory);
+
+  // Cap the history size
+  if (freshHistory.length > BEHAVIORAL_CONFIG.maxHistoryPerIp) {
+    REQUEST_HISTORY.set(ip, freshHistory.slice(-BEHAVIORAL_CONFIG.maxHistoryPerIp));
+  }
+
+  // Periodically clean up old IPs
+  if (REQUEST_HISTORY.size > BEHAVIORAL_CONFIG.maxIpsBeforeCleanup) {
+    cleanupRequestHistory(now);
+  }
+
+  return freshHistory;
+}
+
+function detectBehavioralPatterns(req, history) {
+  const patterns = [];
+  const now = Date.now();
+  const recent = history.filter((entry) => entry.timestamp > now - BEHAVIORAL_CONFIG.recentWindowMs);
+  const recentRapid = history.filter(
+    (entry) => entry.timestamp > now - BEHAVIORAL_CONFIG.rapidFireWindowMs
+  );
+
+  // Check for rapid-fire requests
+  if (recentRapid.length >= 3) {
+    const timeSpan = recentRapid[recentRapid.length - 1].timestamp - recentRapid[0].timestamp || 1;
+    patterns.push({
+      type: "rapid_fire",
+      weight: 0.6,
+      rate: (recentRapid.length / (timeSpan / 1000)).toFixed(1)
+    });
+  }
+
+  // Check for repetitive path access (crawling)
+  if (recent.length >= 5) {
+    const uniquePaths = new Set(recent.map((entry) => entry.path));
+    if (uniquePaths.size >= 3 && uniquePaths.size / recent.length > 0.8) {
+      patterns.push({
+        type: "path_crawling",
+        weight: 0.4,
+        uniquePaths: uniquePaths.size
+      });
+    }
+  }
+
+  // Check timing anomalies
+  if (BEHAVIORAL_PATTERNS.suspiciousTiming(req)) {
+    patterns.push({ type: "suspicious_timing", weight: 0.2 });
+  }
+
+  // Check header anomalies
+  const anomalies = BEHAVIORAL_PATTERNS.headerAnomalies(req);
+  if (anomalies.length >= 2) {
+    patterns.push({ type: "header_anomalies", weight: 0.3, anomalies });
+  }
+
+  return patterns;
+}
+
+function scoreBehavioralPatterns(patterns) {
+  const score = patterns.reduce((total, pattern) => total + (pattern.weight || 0), 0);
+  const hardCount = patterns.filter((pattern) => pattern.type === "rapid_fire").length;
+  return { score, hardCount };
+}
+
+// Enhanced scanner detection wrapper
+function detectScannerEnhancedWithBehavior(req) {
+  // Existing detection
+  const scannerDetections = detectScannerEnhanced(req);
+
+  // Add behavioral analysis
+  const history = trackRequestForBehavior(req);
+  const behavioralPatterns = detectBehavioralPatterns(req, history);
+  const { score: behaviorScore, hardCount } = scoreBehavioralPatterns(behavioralPatterns);
+
+  // Combine results
+  const combinedDetection = [...scannerDetections];
+
+  if (
+    behavioralPatterns.length >= 2 ||
+    (hardCount > 0 && behaviorScore >= BEHAVIORAL_CONFIG.minBehaviorScoreToFlag)
+  ) {
+    const confidence = Math.min(0.9, 0.2 + behaviorScore);
+    combinedDetection.push({
+      name: "Behavioral Pattern",
+      type: "behavioral",
+      confidence,
+      patterns: behavioralPatterns,
+      matchedString: behavioralPatterns.map((pattern) => pattern.type).join(", ")
+    });
+  }
+
+  const ordered = combinedDetection.sort((a, b) => (b.confidence || 0.5) - (a.confidence || 0.5));
+
+  // Score the detection
+  const totalScore = ordered.reduce((score, detection) => {
+    return score + (detection.confidence || 0.5);
+  }, 0);
+
+  return {
+    detections: ordered,
+    behavioralPatterns,
+    totalScore,
+    isScanner: totalScore >= 1.2 && ordered.length > 0,
+    requestCount: history.length
+  };
+}
+
 function logScannerHit(req, reason, nextEnc) {
   const ip   = getClientIp(req);
   const ua   = (req.get("user-agent") || "").slice(0, UA_TRUNCATE_LENGTH);
@@ -1729,8 +1908,9 @@ function checkSecurityPolicies(req) {
   }
 
   // Scanner detection → interstitial (unless bypass)
-  const scannerDetections = detectScannerEnhanced(req);
-  if (!bypassInterstitial && scannerDetections.length > 0) {
+  const scannerResult = detectScannerEnhancedWithBehavior(req);
+  const scannerDetections = scannerResult.detections;
+  if (!bypassInterstitial && scannerResult.isScanner) {
     const topDetection = scannerDetections[0];
     addLog(
       `[SCANNER] interstitial ip=${safeLogValue(ip)} scanner="${safeLogValue(

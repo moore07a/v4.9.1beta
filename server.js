@@ -274,6 +274,15 @@ function validateRedirectParams(req) {
     }
   }
 
+  // Catch-all route hardening: reject obvious scanner paths early so they do not
+  // enter challenge flow/log spam loops.
+  if (req.path !== "/" && !req.path.startsWith("/r") && !req.path.startsWith("/e/")) {
+    const candidate = safeDecode(String((req.originalUrl || "").slice(1).split("?")[0] || ""));
+    if (!candidate || !validateBase64Url(candidate)) {
+      errors.push("Invalid catch-all path: expected encoded redirect payload");
+    }
+  }
+
   return errors;
 }
 
@@ -307,6 +316,9 @@ function validateRedirectRequest(req, res, next) {
     const sendValidationError = () => {
       if (req.path === "/r" && !req.query.d) {
         return res.status(400).send("Missing required parameter: d");
+      }
+      if (errors.some(e => e.includes("Invalid catch-all path"))) {
+        return res.status(404).send("Not Found");
       }
       return res.status(400).send("Invalid request");
     };
@@ -2402,7 +2414,11 @@ async function verifyTurnstileAndRateLimit(req, baseString) {
   const v = await verifyTurnstileToken(token, ip, { action:"link_redirect", linkHash, maxAgeSec:MAX_TOKEN_AGE_SEC });
   if (!v.ok) {
     addLog(`[AUTH] token invalid (${v.reason}) ip=${safeLogValue(ip)} ua="${safeLogValue(ua.slice(0, UA_TRUNCATE_LENGTH))}" -> /challenge`);
-    recordChallengeBypassAttempt(req, `auth_${v.reason || 'invalid'}`);
+    // Missing token is normal for first-time human visits; reserve bypass alerts
+    // for malformed/invalid supplied tokens and tamper-like states.
+    if (token || (v.reason && v.reason !== "missing")) {
+      recordChallengeBypassAttempt(req, `auth_${v.reason || 'invalid'}`);
+    }
     return {
       redirect: createChallengeRedirect(baseString, req, "auth_invalid", {
         host: (v.reason === "bad_hostname" && v.data && v.data.hostname) ? v.data.hostname : ""

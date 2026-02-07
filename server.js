@@ -475,28 +475,31 @@ function normHost(h) {
 
 function normalizeSuffixPattern(value) {
   let s = String(value || "").trim().toLowerCase();
-  if (!s) return "";
-  if (s.startsWith("*.")) s = s.slice(2);
-  if (s.startsWith(".")) s = s.slice(1);
-  return normHost(s);
+  if (!s) return null;
+
+  let includeApex = true;
+  if (s.startsWith("*.")) {
+    includeApex = false;
+    s = s.slice(2);
+  } else if (s.startsWith(".")) {
+    includeApex = false;
+    s = s.slice(1);
+  }
+
+  const suffix = normHost(s);
+  if (!suffix) return null;
+  return { suffix, includeApex };
 }
 
-function hostMatchesSuffix(hostname, suffix) {
+function hostMatchesSuffix(hostname, pattern) {
   const host = normHost(hostname);
-  const normalizedSuffix = normalizeSuffixPattern(suffix);
-  if (!host || !normalizedSuffix) return false;
-  return host === normalizedSuffix || host.endsWith(`.${normalizedSuffix}`);
+  if (!host || !pattern || !pattern.suffix) return false;
+  if (host === pattern.suffix) return pattern.includeApex;
+  return host.endsWith(`.${pattern.suffix}`);
 }
 
 function isHostAllowlisted(hostname) {
   return ALLOWLIST_DOMAINS.some(pattern => hostMatchesSuffix(hostname, pattern));
-}
-
-function hostMatchesSuffix(hostname, suffix) {
-  const host = normHost(hostname);
-  const normalizedSuffix = normHost(String(suffix || "").replace(/^\./, ""));
-  if (!host || !normalizedSuffix) return false;
-  return host === normalizedSuffix || host.endsWith(`.${normalizedSuffix}`);
 }
 
 function parseMinHourToMs(v, fallbackMs) {
@@ -3802,7 +3805,7 @@ function startupSummary() {
     `  • Headless: block=${HEADLESS_BLOCK} hardWeight=${HEADLESS_STRIKE_WEIGHT} softStrike=${HEADLESS_SOFT_STRIKE}`,
     `  • RateLimit: capacity=${RATE_CAPACITY}/window=${RATE_WINDOW_SECONDS}s`,
     `  • Bans: ttl=${BAN_TTL_SEC}s threshold=${BAN_AFTER_STRIKES} hpWeight=${STRIKE_WEIGHT_HP}`,
-    `  • Allowlist patterns=[${ALLOWLIST_DOMAINS.join(",")||"-"}]`,
+    `  • Allowlist patterns=[${ALLOWLIST_DOMAINS.map(p => p.includeApex ? p.suffix : `*.${p.suffix}`).join(",")||"-"}]`,
     `  • Challenge security: rateLimit=5/5min tokens=10min`,
     `  • Geo fallback active=${Boolean(geoip)}`,
     `  • Health: interval=${fmtDurMH(HEALTH_INTERVAL_MS)} heartbeat=${fmtDurMH(HEALTH_HEARTBEAT_MS)}`

@@ -492,6 +492,13 @@ function isHostAllowlisted(hostname) {
   return ALLOWLIST_DOMAINS.some(pattern => hostMatchesSuffix(hostname, pattern));
 }
 
+function hostMatchesSuffix(hostname, suffix) {
+  const host = normHost(hostname);
+  const normalizedSuffix = normHost(String(suffix || "").replace(/^\./, ""));
+  if (!host || !normalizedSuffix) return false;
+  return host === normalizedSuffix || host.endsWith(`.${normalizedSuffix}`);
+}
+
 function parseMinHourToMs(v, fallbackMs) {
   const s = String(v ?? "").trim().toLowerCase();
   if (!s) return fallbackMs;

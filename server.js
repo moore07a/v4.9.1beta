@@ -311,12 +311,23 @@ function validateRedirectRequest(req, res, next) {
       errors.length === 1 && errors[0] === "Invalid catch-all path: expected encoded redirect payload";
 
     if (onlyCatchAllValidationError) {
+<<<<<<< codex/analyze-log-entries-for-errors-pfruze
       // For noisy catch-all probes, aggregate per IP and emit only summary lines
       // via flushAggregatedLogs instead of logging every first-hit attempt.
       aggregatePerIpEvent("VALIDATION-FAILED", {
         ip,
         reason: "invalid_catch_all_path"
       });
+=======
+      const shouldLog = aggregatePerIpEvent("VALIDATION-FAILED", {
+        ip,
+        reason: "invalid_catch_all_path"
+      });
+
+      if (shouldLog) {
+        addLog(`[VALIDATION-FAILED] ip=${safeLogValue(ip)} path=${req.path} errors=${errors.join(", ")} ua="${safeLogValue(ua.slice(0, 100))}"`);
+      }
+>>>>>>> main
     } else {
       addLog(`[VALIDATION-FAILED] ip=${safeLogValue(ip)} path=${req.path} errors=${errors.join(", ")} ua="${safeLogValue(ua.slice(0, 100))}"`);
     }

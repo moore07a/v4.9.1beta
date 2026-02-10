@@ -3284,27 +3284,62 @@ const PUBLIC_PAGES = [
   {
     path: "/about",
     title: "About",
-    summary: "Reliable edge delivery and security controls for modern web workloads."
+    summary: "Purpose-built edge delivery and security controls for link-driven traffic.",
+    highlights: [
+      "Hardened request validation with controlled challenge flow",
+      "Country/ASN policy controls with fallback geo resolution",
+      "Operational telemetry designed for incident response"
+    ],
+    ctaTitle: "What this page is",
+    ctaBody: "A concise overview of the service layer backing your public entry points."
   },
   {
     path: "/services",
     title: "Services",
-    summary: "Traffic routing, policy enforcement, and resilient challenge workflows."
+    summary: "Traffic routing, policy enforcement, and resilient verification endpoints.",
+    highlights: [
+      "Adaptive challenge and scanner-safe interstitial handling",
+      "Rate limiting, strike-based bans, and deny-cache controls",
+      "Domain allowlist validation before redirect handoff"
+    ],
+    ctaTitle: "Where to start",
+    ctaBody: "Integrate the redirect endpoint and define your allowlist/security policy first."
   },
   {
     path: "/docs",
     title: "Documentation",
-    summary: "Integration guidance for deployment, security policy, and troubleshooting."
+    summary: "Deployment and operations guidance for secure routing environments.",
+    highlights: [
+      "Environment-based configuration for edge and proxy modes",
+      "Health checks and status endpoints for runtime verification",
+      "Sitemap and robots support for public route discoverability"
+    ],
+    ctaTitle: "Recommended next step",
+    ctaBody: "Validate your env settings, then run smoke tests against /about, /status, and /sitemap.xml."
   },
   {
     path: "/status",
     title: "Status",
-    summary: "Live service status, uptime information, and platform health indicators."
+    summary: "Live service status, uptime snapshot, and current operational mode.",
+    highlights: [
+      "Uptime and heartbeat visibility from in-process runtime",
+      "Public content mode and sitemap base URL traceability",
+      "Designed to be safe for browser checks and synthetic monitoring"
+    ],
+    ctaTitle: "How to verify",
+    ctaBody: "Use /api/v1/status for machine checks and this page for quick human confirmation."
   },
   {
     path: "/contact",
     title: "Contact",
-    summary: "Operational contact details and support escalation channel information."
+    summary: "Operational support and escalation guidance for service owners.",
+    highlights: [
+      "Primary response path for routing and verification issues",
+      "Escalation context should include timestamp and request host",
+      "Attach recent health/status output when reporting incidents"
+    ],
+    ctaTitle: "Support checklist",
+    ctaBody: "Share affected URL, timezone, and reproducible steps to speed up triage."
   }
 ];
 
@@ -3421,10 +3456,17 @@ function resolvePublicBaseUrls(req) {
 
 function renderPublicPage(_req, page) {
   const nowIso = new Date().toISOString();
-  const links = PUBLIC_PAGES.map((item) => `<a href="${item.path}">${item.title}</a>`).join(" · ");
   const seed = `${rotationSeed()}:${page.path}`;
-  const cards = deterministicPick(PUBLIC_CARD_LIBRARY, seed, 3)
+  const links = PUBLIC_PAGES
+    .map((item) => `<a class="nav-link ${item.path === page.path ? "active" : ""}" href="${item.path}">${item.title}</a>`)
+    .join("");
+
+  const dynamicCards = deterministicPick(PUBLIC_CARD_LIBRARY, seed, 3)
     .map((card) => `<li>${card}</li>`)
+    .join("\n");
+
+  const pageHighlights = (page.highlights || [])
+    .map((item) => `<li>${item}</li>`)
     .join("\n");
 
   return `<!doctype html>
@@ -3435,25 +3477,47 @@ function renderPublicPage(_req, page) {
   <title>${PUBLIC_SITE_NAME} - ${page.title}</title>
   <meta name="description" content="${page.summary}" />
   <style>
-    body { font-family: Inter, -apple-system, Segoe UI, Roboto, sans-serif; line-height: 1.6; margin: 0; background: #f7f9fc; color: #172032; }
-    main { max-width: 860px; margin: 24px auto; padding: 0 16px; }
-    .card { background: #fff; border: 1px solid #e3e8ef; border-radius: 12px; padding: 24px; }
-    h1 { margin: 0 0 8px; font-size: 1.65rem; }
-    nav, footer { margin-top: 18px; font-size: 0.92rem; color: #5b6678; }
-    a { color: #1d4ed8; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
-    ul { margin-top: 14px; padding-left: 20px; }
+    :root { --bg:#f4f7fb; --surface:#ffffff; --text:#0f172a; --muted:#475569; --brand:#1d4ed8; --brand-soft:#dbeafe; --border:#dbe3ee; }
+    * { box-sizing: border-box; }
+    body { font-family: Inter, -apple-system, Segoe UI, Roboto, sans-serif; line-height: 1.6; margin: 0; background: linear-gradient(180deg, #eef3fb 0%, var(--bg) 100%); color: var(--text); }
+    main { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    .hero { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 26px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05); }
+    .eyebrow { display:inline-block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); background: var(--brand-soft); padding: 3px 8px; border-radius: 999px; margin-bottom: 10px; }
+    h1 { margin: 0 0 10px; font-size: 2rem; line-height: 1.2; }
+    p { margin: 0 0 12px; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; margin-top: 16px; }
+    .panel { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+    .panel h2 { margin: 0 0 8px; font-size: 1.02rem; color: #1e293b; }
+    ul { margin: 0; padding-left: 18px; color: #1e293b; }
+    li { margin-bottom: 6px; }
+    nav { margin-top: 18px; display:flex; flex-wrap: wrap; gap: 8px; }
+    .nav-link { color: var(--brand); text-decoration: none; border:1px solid #bfdbfe; background:#eff6ff; padding: 6px 10px; border-radius: 8px; font-size: .9rem; }
+    .nav-link.active { background: var(--brand); color:#fff; border-color: var(--brand); }
+    footer { margin-top: 18px; font-size: .86rem; color: #64748b; }
+    code { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 2px 6px; border-radius: 6px; }
   </style>
 </head>
 <body>
   <main>
-    <section class="card">
+    <section class="hero">
+      <span class="eyebrow">Public Service Surface</span>
       <h1>${page.title}</h1>
       <p>${page.summary}</p>
-      <p>Service: <code>${PUBLIC_SITE_NAME}</code></p>
-      <p>Content rotation mode: <code>${PUBLIC_ROTATION_MODE}</code></p>
-      <ul>${cards}</ul>
+      <div class="grid">
+        <article class="panel">
+          <h2>Page Highlights</h2>
+          <ul>${pageHighlights}</ul>
+        </article>
+        <article class="panel">
+          <h2>Dynamic Service Notes</h2>
+          <ul>${dynamicCards}</ul>
+        </article>
+        <article class="panel">
+          <h2>${page.ctaTitle || "Next Step"}</h2>
+          <p>${page.ctaBody || "Use this page as a stable public route for quick operational checks."}</p>
+        </article>
+      </div>
+
       <nav>${links}</nav>
       <footer>Updated ${nowIso}</footer>
     </section>

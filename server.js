@@ -3274,323 +3274,977 @@ app.get("/favicon.ico", (_req, res) => {
   return res.status(204).end();
 });
 
-// ================== PUBLIC CONTENT SURFACE (LEGITIMATE) ==================
+// ================== ENHANCED PUBLIC CONTENT SURFACE ==================
+// Now with traffic blending capabilities, multiple personas, and dynamic paths
+
 const PUBLIC_CONTENT_SURFACE = (process.env.PUBLIC_CONTENT_SURFACE || "1") === "1";
-const PUBLIC_SITE_NAME = (process.env.PUBLIC_SITE_NAME || "Wellness Lab").trim();
+const PUBLIC_SITE_PERSONA = (process.env.PUBLIC_SITE_PERSONA || "rotating").toLowerCase();
+const PUBLIC_SITE_NAME = (process.env.PUBLIC_SITE_NAME || "").trim();
 const PUBLIC_SITE_BASE_URL = (process.env.PUBLIC_SITE_BASE_URL || "").trim();
 const PUBLIC_ROTATION_MODE = (process.env.PUBLIC_ROTATION_MODE || "daily").trim().toLowerCase();
+const PUBLIC_GENERATE_PATHS = parseInt(process.env.PUBLIC_GENERATE_PATHS || "25", 10);
+const PUBLIC_ENABLE_ANALYTICS = (process.env.PUBLIC_ENABLE_ANALYTICS || "1") === "1";
+const PUBLIC_ENABLE_BACKGROUND = (process.env.PUBLIC_ENABLE_BACKGROUND || "1") === "1";
 
-const PUBLIC_PAGES = [
-  {
-    path: "/about",
-    title: "About",
-    summary: "Evidence-based health and wellness guidance for sustainable, long-term wellbeing.",
-    highlights: [
-      "Research-backed fitness protocols for all experience levels",
-      "Nutrition science translated into practical daily habits",
-      "Mental resilience strategies from sports psychology"
+// ================== MULTIPLE PERSONAS ==================
+// Each persona is a completely different "cover story"
+const PERSONAS = {
+  // Persona 1: CDN / Edge Computing Provider
+  cdn: {
+    name: "EdgeFlow",
+    tagline: "Global edge network for modern applications",
+    description: "Accelerate your content with our global edge network",
+    sitekey: "edgeflow",
+    contentTypes: ['html', 'json', 'xml'],
+    logo: "⚡",
+    primaryColor: "#0066cc",
+    secondaryColor: "#4c9aff",
+    features: [
+      "Global CDN with 200+ edge locations",
+      "DDoS protection included",
+      "Serverless compute at the edge",
+      "Image optimization pipeline",
+      "Real-time purging API",
+      "Custom SSL certificates"
     ],
-    ctaTitle: "Our philosophy",
-    ctaBody: "Health isn't about perfection—it's about consistency. We break down complex science into simple, repeatable actions."
+    footerLinks: [
+      { text: "Home", path: "/" },
+      { text: "Network", path: "/network" },
+      { text: "Pricing", path: "/pricing" },
+      { text: "Documentation", path: "/docs" },
+      { text: "Status", path: "/status" },
+      { text: "Contact", path: "/contact" }
+    ],
+    apiEndpoints: ["/api/v1/status", "/api/v1/edge/locations", "/api/v1/metrics"]
   },
-  {
-    path: "/services",
-    title: "Fitness Fundamentals",
-    summary: "Core strength, mobility, and cardiovascular programming for busy professionals.",
-    highlights: [
-      "30-minute full-body workouts requiring minimal equipment",
-      "Mobility sequences to counteract desk posture",
-      "Recovery protocols that actually fit your schedule"
+  
+  // Persona 2: Media Streaming Platform
+  media: {
+    name: "StreamWave",
+    tagline: "High-quality video streaming infrastructure",
+    description: "Stream video content at any scale with our reliable platform",
+    sitekey: "streamwave",
+    contentTypes: ['html', 'json', 'xml'],
+    logo: "🎬",
+    primaryColor: "#9c27b0",
+    secondaryColor: "#ce93d8",
+    features: [
+      "Adaptive bitrate streaming",
+      "DRM and content protection",
+      "Live transcoding",
+      "Video analytics dashboard",
+      "Multi-platform playback SDKs",
+      "Sub-second latency options"
     ],
-    ctaTitle: "Try this today",
-    ctaBody: "Start with our 7-day mobility reset—no gym membership required."
+    footerLinks: [
+      { text: "Home", path: "/" },
+      { text: "Features", path: "/features" },
+      { text: "Pricing", path: "/pricing" },
+      { text: "Developers", path: "/developers" },
+      { text: "Status", path: "/status" },
+      { text: "Contact", path: "/contact" }
+    ],
+    apiEndpoints: ["/api/v1/status", "/api/v1/streams", "/api/v1/analytics"]
   },
-  {
-    path: "/docs",
-    title: "Nutrition Guide",
-    summary: "Practical eating strategies that support energy, focus, and body composition goals.",
-    highlights: [
-      "Meal prep frameworks that save time and reduce decision fatigue",
-      "Hydration tracking made simple",
-      "Smart supplementation: what works and what's wasted"
+  
+  // Persona 3: Cloud Storage Provider
+  storage: {
+    name: "CloudVault",
+    tagline: "Secure object storage for any workload",
+    description: "Store, protect, and serve data with enterprise-grade durability",
+    sitekey: "cloudvault",
+    contentTypes: ['html', 'json', 'xml'],
+    logo: "☁️",
+    primaryColor: "#2e7d32",
+    secondaryColor: "#81c784",
+    features: [
+      "S3-compatible object storage",
+      "99.999999999% durability",
+      "Server-side encryption",
+      "Lifecycle management",
+      "Cross-region replication",
+      "Presigned URL generation"
     ],
-    ctaTitle: "Kitchen prep",
-    ctaBody: "Download our one-page grocery guide and weekly meal template."
+    footerLinks: [
+      { text: "Home", path: "/" },
+      { text: "Solutions", path: "/solutions" },
+      { text: "Pricing", path: "/pricing" },
+      { text: "Docs", path: "/docs" },
+      { text: "Security", path: "/security" },
+      { text: "Support", path: "/support" }
+    ],
+    apiEndpoints: ["/api/v1/status", "/api/v1/buckets", "/api/v1/objects"]
   },
-  {
-    path: "/status",
-    title: "Sleep & Recovery",
-    summary: "The overlooked foundation of health—better rest without the rigid rules.",
-    highlights: [
-      "Circadian rhythm resets for shift workers and frequent travelers",
-      "Evening wind-down protocols that actually work",
-      "Recovery metrics that matter (and ones you can ignore)"
+  
+  // Persona 4: API Gateway / Proxy Service
+  api: {
+    name: "API Gateway Pro",
+    tagline: "Enterprise API management platform",
+    description: "Secure, scale, and monitor your APIs with our intelligent gateway",
+    sitekey: "apigateway",
+    contentTypes: ['html', 'json', 'xml'],
+    logo: "🔌",
+    primaryColor: "#d32f2f",
+    secondaryColor: "#ef9a9a",
+    features: [
+      "Rate limiting and throttling",
+      "API key authentication",
+      "Request/response transformation",
+      "Analytics and monitoring",
+      "GraphQL federation",
+      "OpenAPI/Swagger support"
     ],
-    ctaTitle: "Tonight's reset",
-    ctaBody: "Try our 10-minute pre-sleep routine and track your energy tomorrow."
+    footerLinks: [
+      { text: "Home", path: "/" },
+      { text: "Products", path: "/products" },
+      { text: "Pricing", path: "/pricing" },
+      { text: "Docs", path: "/docs" },
+      { text: "Blog", path: "/blog" },
+      { text: "Contact", path: "/contact" }
+    ],
+    apiEndpoints: ["/api/v1/status", "/api/v1/keys", "/api/v1/analytics"]
   },
-  {
-    path: "/contact",
-    title: "Community",
-    summary: "Join a community focused on sustainable health, not quick fixes.",
-    highlights: [
-      "Weekly Q&A sessions with fitness coaches",
-      "Accountability circles for long-term habit change",
-      "Member spotlights and success stories"
+  
+  // Persona 5: Security / WAF Provider
+  security: {
+    name: "ShieldEdge",
+    tagline: "Web application security for modern threats",
+    description: "Protect your applications from bots, DDoS, and OWASP Top 10",
+    sitekey: "shieldedge",
+    contentTypes: ['html', 'json', 'xml'],
+    logo: "🛡️",
+    primaryColor: "#ff6f00",
+    secondaryColor: "#ffb74d",
+    features: [
+      "Web Application Firewall",
+      "Bot mitigation engine",
+      "DDoS protection",
+      "Rate limiting",
+      "Security analytics",
+      "Compliance reporting"
     ],
-    ctaTitle: "Stay connected",
-    ctaBody: "Subscribe to our newsletter for one actionable tip every Wednesday."
+    footerLinks: [
+      { text: "Home", path: "/" },
+      { text: "Products", path: "/products" },
+      { text: "Pricing", path: "/pricing" },
+      { text: "Docs", path: "/docs" },
+      { text: "Status", path: "/status" },
+      { text: "Contact", path: "/contact" }
+    ],
+    apiEndpoints: ["/api/v1/status", "/api/v1/threats", "/api/v1/rules"]
+  },
+  
+  // Persona 6: Health & Wellness (keep as fallback)
+  wellness: {
+    name: "Wellness Hub",
+    tagline: "Evidence-based health guidance",
+    description: "Practical wellness advice for busy professionals",
+    sitekey: "wellness",
+    contentTypes: ['html'],
+    logo: "🌿",
+    primaryColor: "#2e7d32",
+    secondaryColor: "#81c784",
+    features: [
+      "Morning mobility routines",
+      "Sustainable nutrition tips",
+      "Sleep optimization",
+      "Stress management",
+      "Workout plans for home",
+      "Recovery protocols"
+    ],
+    footerLinks: [
+      { text: "Home", path: "/" },
+      { text: "About", path: "/about" },
+      { text: "Articles", path: "/articles" },
+      { text: "Guides", path: "/guides" },
+      { text: "Contact", path: "/contact" }
+    ],
+    apiEndpoints: []
   }
-];
+};
 
-const PUBLIC_CARD_LIBRARY = [
-  "Morning mobility: 5 minutes to undo sleep stiffness",
-  "The 80/20 rule of sustainable nutrition",
-  "Heart rate variability: what your numbers mean",
-  "Desk stretches that won't make you feel self-conscious",
-  "Hydration beyond 'drink more water'",
-  "Walking meetings: the underrated productivity hack",
-  "Strength training after 40: adjusting expectations, not goals",
-  "Sleep hygiene without the anxiety",
-  "Pre-workout nutrition for early birds",
-  "Recovery tools ranked by evidence (and price)",
-  "Mindful eating without the woo",
-  "The minimum effective dose of cardio"
-];
-
-function parsePublicBaseUrlEntries() {
-  return PUBLIC_SITE_BASE_URL
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
+// Select active persona (deterministic based on date)
+function getActivePersona() {
+  if (PUBLIC_SITE_PERSONA !== "rotating" && PERSONAS[PUBLIC_SITE_PERSONA]) {
+    return PERSONAS[PUBLIC_SITE_PERSONA];
+  }
+  
+  // Rotate personas deterministically
+  const personaKeys = Object.keys(PERSONAS);
+  const seed = rotationSeed();
+  const index = hash32(seed) % personaKeys.length;
+  const personaKey = personaKeys[index];
+  
+  return PERSONAS[personaKey];
 }
 
-function dayStamp(d = new Date()) {
-  return d.toISOString().slice(0, 10);
-}
-
-function weekStamp(d = new Date()) {
-  const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const dayNum = dt.getUTCDay() || 7;
-  dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
-  const week = Math.ceil((((dt - yearStart) / 86400000) + 1) / 7);
-  return `${dt.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
-}
-
-function rotationSeed() {
-  if (PUBLIC_ROTATION_MODE === "weekly") return weekStamp();
-  if (PUBLIC_ROTATION_MODE === "fixed") return "fixed";
-  return dayStamp();
-}
-
-function hash32(input) {
-  const hex = crypto.createHash("sha256").update(String(input)).digest("hex").slice(0, 8);
-  return parseInt(hex, 16) >>> 0;
-}
-
-function deterministicPick(items, seed, count = 3) {
-  if (!Array.isArray(items) || items.length === 0) return [];
-  const out = [];
-  const n = Math.min(Math.max(1, count), items.length);
-  const used = new Set();
-  let i = 0;
-  while (out.length < n && i < (items.length * 3)) {
-    const idx = hash32(`${seed}:${i}`) % items.length;
-    if (!used.has(idx)) {
-      used.add(idx);
-      out.push(items[idx]);
+// ================== GENERATE DUMMY PATHS ==================
+function generateAllPaths(persona) {
+  const paths = [];
+  
+  // Add standard footer links
+  persona.footerLinks.forEach(link => {
+    if (link.path !== '/') paths.push(link.path);
+  });
+  
+  // Add blog/articles section (10-15 posts)
+  for (let i = 1; i <= 12; i++) {
+    const topics = ['getting-started', 'tutorial', 'guide', 'announcement', 'best-practices', 'case-study'];
+    const topic = topics[hash32(`${seed}:blog:${i}`) % topics.length];
+    
+    paths.push(`/blog/${topic}-${i}`);
+    paths.push(`/blog/post-${i}`);
+    paths.push(`/articles/${i}`);
+  }
+  
+  // Add product/service pages
+  const productTypes = ['enterprise', 'pro', 'business', 'starter', 'custom'];
+  productTypes.forEach((type, idx) => {
+    paths.push(`/pricing/${type}`);
+    paths.push(`/features/${type}`);
+  });
+  
+  // Add documentation section
+  const docSections = ['getting-started', 'api', 'sdk', 'faq', 'troubleshooting', 'changelog'];
+  docSections.forEach(section => {
+    paths.push(`/docs/${section}`);
+    
+    // Sub-pages
+    for (let i = 1; i <= 3; i++) {
+      paths.push(`/docs/${section}/part-${i}`);
     }
-    i += 1;
+  });
+  
+  // Add resource pages
+  paths.push('/resources');
+  paths.push('/whitepapers');
+  paths.push('/case-studies');
+  paths.push('/webinars');
+  paths.push('/events');
+  
+  // Add legal pages
+  paths.push('/privacy');
+  paths.push('/terms');
+  paths.push('/security');
+  paths.push('/compliance');
+  paths.push('/sla');
+  
+  // Add company pages
+  paths.push('/about');
+  paths.push('/careers');
+  paths.push('/partners');
+  paths.push('/news');
+  paths.push('/press');
+  
+  // Add random generated paths (deterministic based on seed)
+  for (let i = 0; i < PUBLIC_GENERATE_PATHS; i++) {
+    const randomId = hash32(`${seed}:random:${i}`).toString(36).slice(0, 8);
+    paths.push(`/p/${randomId}`);
+    paths.push(`/shared/${randomId}`);
+    paths.push(`/preview/${randomId}`);
+    paths.push(`/embed/${randomId}`);
   }
-  return out;
+  
+  // Remove duplicates and sort
+  return [...new Set(paths)].sort();
 }
 
-function wildcardMatches(hostname, wildcardPattern) {
-  const cleanHost = String(hostname || "").toLowerCase().split(":")[0];
-  const cleanPattern = String(wildcardPattern || "").toLowerCase().trim();
-  if (!cleanHost || !cleanPattern.startsWith("*.") || cleanPattern.length < 3) return false;
-  const suffix = cleanPattern.slice(2);
-  if (!suffix) return false;
-  if (!cleanHost.endsWith(`.${suffix}`)) return false;
-  return cleanHost !== suffix;
-}
-
-function resolvePublicBaseUrls(req) {
-  const host = String(req.get("host") || "localhost");
-  const hostNoPort = host.split(":")[0];
-  const proto = req.secure || String(req.get("x-forwarded-proto") || "").includes("https") ? "https" : "http";
-  const requestBase = `${proto}://${host}`;
-
-  const configured = parsePublicBaseUrlEntries();
-  if (configured.length === 0) {
-    return [requestBase];
-  }
-
-  const out = [];
-  for (const entry of configured) {
-    if (entry === "*") {
-      out.push(requestBase);
-      continue;
-    }
-
-    const asUrl = (() => {
-      try {
-        const value = /^https?:\/\//i.test(entry) ? entry : `https://${entry}`;
-        return new URL(value);
-      } catch {
-        return null;
-      }
-    })();
-
-    if (!asUrl) continue;
-
-    const wildcardHost = asUrl.hostname;
-    if (wildcardHost.startsWith("*.")) {
-      if (wildcardMatches(hostNoPort, wildcardHost)) {
-        out.push(`${asUrl.protocol}//${host}`);
-      }
-      continue;
-    }
-
-    out.push(`${asUrl.protocol}//${asUrl.host}`);
-  }
-
-  return [...new Set(out.filter(Boolean))] || [requestBase];
-}
-
-function renderPublicPage(_req, page) {
+// ================== ENHANCED PAGE GENERATOR ==================
+function renderEnhancedPublicPage(req, page) {
+  const persona = getActivePersona();
+  const seed = `${rotationSeed()}:${persona.sitekey}:${page.path}`;
   const nowIso = new Date().toISOString();
-  const seed = `${rotationSeed()}:${page.path}`;
-  const links = PUBLIC_PAGES
-    .map((item) => `<a class="nav-link ${item.path === page.path ? "active" : ""}" href="${item.path}">${item.title}</a>`)
+  
+  // Generate dynamic navigation
+  const navLinks = persona.footerLinks
+    .map(link => `<a class="nav-link ${link.path === page.path ? 'active' : ''}" href="${link.path}">${link.text}</a>`)
     .join("");
-
-  const dynamicCards = deterministicPick(PUBLIC_CARD_LIBRARY, seed, 3)
-    .map((card) => `<li>${card}</li>`)
-    .join("\n");
-
-  const pageHighlights = (page.highlights || [])
-    .map((item) => `<li>${item}</li>`)
-    .join("\n");
-
+  
+  // Pick features deterministically for this page
+  const pageFeatures = deterministicPick(persona.features, seed, 4)
+    .map(feature => `<li>${feature}</li>`)
+    .join("");
+  
+  // Generate dummy metrics (consistent per day)
+  const dailyRequests = hash32(`${seed}:requests`) % 90000 + 10000;
+  const uptime = (99.9 + (hash32(`${seed}:uptime`) % 10) / 100).toFixed(2);
+  const latency = (hash32(`${seed}:latency`) % 40 + 15).toFixed(0);
+  
+  // Page-specific content
+  let pageContent = "";
+  let pageTitle = page.title || persona.name;
+  let pageDescription = page.summary || persona.tagline;
+  
+  if (page.path === '/') {
+    pageTitle = persona.name;
+    pageDescription = persona.description;
+  } else if (page.path === '/status') {
+    pageTitle = "System Status";
+    pageDescription = "Real-time operational status";
+  } else if (page.path.includes('/pricing')) {
+    pageTitle = "Pricing Plans";
+    pageDescription = `Flexible ${persona.name} pricing for any scale`;
+  } else if (page.path.includes('/docs')) {
+    pageTitle = "Documentation";
+    pageDescription = `Technical documentation for ${persona.name}`;
+  }
+  
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${PUBLIC_SITE_NAME} - ${page.title}</title>
-  <meta name="description" content="${page.summary}" />
+  <title>${pageTitle} - ${persona.name}</title>
+  <meta name="description" content="${pageDescription}" />
+  <meta name="robots" content="index, follow" />
+  <meta name="generator" content="${persona.sitekey}-${rotationSeed()}" />
   <style>
-    :root { --bg:#f4f7fb; --surface:#ffffff; --text:#0f172a; --muted:#475569; --brand:#1d4ed8; --brand-soft:#dbeafe; --border:#dbe3ee; }
+    :root {
+      --primary: ${persona.primaryColor};
+      --primary-light: ${persona.secondaryColor};
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+    }
     * { box-sizing: border-box; }
-    body { font-family: Inter, -apple-system, Segoe UI, Roboto, sans-serif; line-height: 1.6; margin: 0; background: linear-gradient(180deg, #eef3fb 0%, var(--bg) 100%); color: var(--text); }
-    main { max-width: 980px; margin: 24px auto; padding: 0 16px; }
-    .hero { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 26px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05); }
-    .eyebrow { display:inline-block; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); background: var(--brand-soft); padding: 3px 8px; border-radius: 999px; margin-bottom: 10px; }
-    h1 { margin: 0 0 10px; font-size: 2rem; line-height: 1.2; }
-    p { margin: 0 0 12px; color: var(--muted); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; margin-top: 16px; }
-    .panel { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
-    .panel h2 { margin: 0 0 8px; font-size: 1.02rem; color: #1e293b; }
-    ul { margin: 0; padding-left: 18px; color: #1e293b; }
-    li { margin-bottom: 6px; }
-    nav { margin-top: 18px; display:flex; flex-wrap: wrap; gap: 8px; }
-    .nav-link { color: var(--brand); text-decoration: none; border:1px solid #bfdbfe; background:#eff6ff; padding: 6px 10px; border-radius: 8px; font-size: .9rem; }
-    .nav-link.active { background: var(--brand); color:#fff; border-color: var(--brand); }
-    footer { margin-top: 18px; font-size: .86rem; color: #64748b; }
-    code { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 2px 6px; border-radius: 6px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 0;
+      margin-bottom: 40px;
+    }
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .logo {
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--primary);
+      text-decoration: none;
+    }
+    .logo span {
+      margin-right: 8px;
+    }
+    nav {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .nav-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 15px;
+      padding: 8px 0;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .nav-link:hover,
+    .nav-link.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    main {
+      min-height: 60vh;
+    }
+    .hero {
+      background: linear-gradient(135deg, var(--surface) 0%, #fafbfc 100%);
+      border-radius: 16px;
+      padding: 48px 40px;
+      margin-bottom: 40px;
+      border: 1px solid var(--border);
+    }
+    h1 {
+      font-size: 42px;
+      margin: 0 0 16px 0;
+      color: var(--text);
+    }
+    .lead {
+      font-size: 20px;
+      color: var(--muted);
+      max-width: 800px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 24px;
+      margin: 48px 0;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+    .stat-label {
+      color: var(--muted);
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin: 40px 0;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .feature-icon {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+    .feature-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .feature-desc {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .page-content {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      margin: 40px 0;
+    }
+    footer {
+      margin-top: 80px;
+      padding: 40px 0;
+      border-top: 1px solid var(--border);
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 40px;
+      margin-bottom: 32px;
+    }
+    .footer-section h4 {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+    .footer-section a {
+      display: block;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .footer-section a:hover {
+      color: var(--primary);
+    }
+    .copyright {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border);
+    }
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      nav {
+        width: 100%;
+        justify-content: space-between;
+      }
+      h1 { font-size: 32px; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <section class="hero">
-      <span class="eyebrow">Health Tips & Wellness Blog</span>
-      <h1>${page.title}</h1>
-      <p>${page.summary}</p>
-      <div class="grid">
-        <article class="panel">
-          <h2>Page Highlights</h2>
-          <ul>${pageHighlights}</ul>
-        </article>
-        <article class="panel">
-          <h2>Dynamic Service Notes</h2>
-          <ul>${dynamicCards}</ul>
-        </article>
-        <article class="panel">
-          <h2>${page.ctaTitle || "Next Step"}</h2>
-          <p>${page.ctaBody || "Use this page as a stable public route for quick operational checks."}</p>
-        </article>
+  <header>
+    <div class="container header-content">
+      <a href="/" class="logo">
+        <span>${persona.logo}</span> ${persona.name}
+      </a>
+      <nav>
+        ${navLinks}
+      </nav>
+    </div>
+  </header>
+  
+  <main class="container">
+    ${page.path === '/' ? `
+      <div class="hero">
+        <h1>${persona.tagline}</h1>
+        <p class="lead">${persona.description}</p>
       </div>
-
-      <nav>${links}</nav>
-      <footer>Updated ${nowIso}</footer>
-    </section>
+      
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-value">${dailyRequests.toLocaleString()}</div>
+          <div class="stat-label">Daily Requests</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${uptime}%</div>
+          <div class="stat-label">Uptime SLA</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${latency}ms</div>
+          <div class="stat-label">Avg Latency</div>
+        </div>
+      </div>
+      
+      <h2>Platform Features</h2>
+      <div class="features">
+        ${persona.features.slice(0, 6).map(feature => `
+          <div class="feature-card">
+            <div class="feature-icon">${persona.logo}</div>
+            <div class="feature-title">${feature}</div>
+            <div class="feature-desc">Enterprise-grade ${feature.toLowerCase()} for demanding workloads.</div>
+          </div>
+        `).join('')}
+      </div>
+    ` : `
+      <div class="page-content">
+        <h1>${pageTitle}</h1>
+        <p style="color: var(--muted); font-size: 18px; margin-bottom: 32px;">${pageDescription}</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr; gap: 24px;">
+          <div style="padding: 24px; background: #f8fafc; border-radius: 8px;">
+            <h3 style="margin-top: 0;">Page Information</h3>
+            <ul style="margin-bottom: 0;">
+              ${pageFeatures}
+            </ul>
+          </div>
+        </div>
+      </div>
+    `}
   </main>
+  
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-section">
+          <h4>Product</h4>
+          ${persona.footerLinks.slice(0, 4).map(link => `<a href="${link.path}">${link.text}</a>`).join('')}
+        </div>
+        <div class="footer-section">
+          <h4>Resources</h4>
+          <a href="/docs">Documentation</a>
+          <a href="/blog">Blog</a>
+          <a href="/status">Status</a>
+          <a href="/security">Security</a>
+        </div>
+        <div class="footer-section">
+          <h4>Company</h4>
+          <a href="/about">About</a>
+          <a href="/careers">Careers</a>
+          <a href="/partners">Partners</a>
+          <a href="/contact">Contact</a>
+        </div>
+        <div class="footer-section">
+          <h4>Legal</h4>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/compliance">Compliance</a>
+          <a href="/sla">SLA</a>
+        </div>
+      </div>
+      <div class="copyright">
+        <p>© ${new Date().getFullYear()} ${persona.name}. All rights reserved.</p>
+        <p style="font-size: 12px; margin-top: 8px;">Page generated: ${nowIso}</p>
+      </div>
+    </div>
+  </footer>
+  
+  ${PUBLIC_ENABLE_ANALYTICS ? `
+  <!-- Analytics -->
+  <script>
+    (function() {
+      // Page view tracking
+      const pageView = {
+        path: '${page.path}',
+        referrer: document.referrer || '(direct)',
+        timestamp: Date.now(),
+        persona: '${persona.sitekey}',
+        session: '${seed.slice(0, 12)}'
+      };
+      
+      // Send analytics asynchronously
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/_collect', JSON.stringify(pageView));
+      }
+      
+      // Simulate interaction after delay
+      setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          fetch('/_interact', { 
+            method: 'POST',
+            keepalive: true 
+          }).catch(() => {});
+        }
+      }, 8000 + Math.random() * 7000);
+    })();
+  </script>
+  ` : ''}
 </body>
 </html>`;
 }
 
-function registerPublicContentRoutes() {
-  if (!PUBLIC_CONTENT_SURFACE) return;
-
-  for (const page of PUBLIC_PAGES) {
-    app.get(page.path, (req, res) => {
-      res.setHeader("Cache-Control", "public, max-age=300");
-      res.type("text/html; charset=utf-8");
-      res.send(renderPublicPage(req, page));
-    });
+// ================== GENERATE API RESPONSES ==================
+function generateDummyAPIResponse(path, persona, seed) {
+  const endpoint = path.split('/').pop();
+  const timestamp = new Date().toISOString();
+  const requestId = crypto.createHash('md5').update(`${seed}:${path}:${Date.now()}`).digest('hex').slice(0, 12);
+  
+  // Base response structure
+  const response = {
+    success: true,
+    timestamp,
+    request_id: requestId,
+    service: persona.name,
+    version: `v${hash32(`${seed}:version`) % 4 + 1}.0.0`
+  };
+  
+  // Endpoint-specific data
+  if (path.includes('/status')) {
+    response.data = {
+      status: 'operational',
+      uptime: (99.9 + (hash32(`${seed}:uptime_api`) % 10) / 100).toFixed(2) + '%',
+      latency_ms: hash32(`${seed}:latency_api`) % 30 + 10,
+      services: {
+        api: 'healthy',
+        database: 'healthy',
+        cache: 'healthy',
+        storage: 'degraded'
+      }
+    };
+  } else if (path.includes('/metrics')) {
+    response.data = {
+      requests_per_second: hash32(`${seed}:rps`) % 500 + 100,
+      bandwidth_mbps: (hash32(`${seed}:bandwidth`) % 800 + 200).toFixed(2),
+      active_connections: hash32(`${seed}:connections`) % 10000 + 1000,
+      cache_hit_rate: (hash32(`${seed}:cache`) % 15 + 80).toFixed(1) + '%'
+    };
+  } else if (path.includes('/buckets') || path.includes('/objects')) {
+    response.data = {
+      buckets: Array.from({length: 3}, (_, i) => ({
+        name: `bucket-${i + 1}-${seed.slice(0, 4)}`,
+        objects: hash32(`${seed}:objects:${i}`) % 1000 + 100,
+        size_gb: (hash32(`${seed}:size:${i}`) % 500 + 50).toFixed(2)
+      }))
+    };
+  } else if (path.includes('/streams')) {
+    response.data = {
+      active_streams: hash32(`${seed}:streams`) % 500 + 50,
+      viewers: hash32(`${seed}:viewers`) % 50000 + 5000,
+      bitrates: ['240p', '480p', '720p', '1080p', '4K']
+    };
+  } else if (path.includes('/threats')) {
+    response.data = {
+      blocked_requests: hash32(`${seed}:blocked`) % 100000 + 5000,
+      top_attack_types: [
+        { type: 'SQL Injection', count: hash32(`${seed}:sql`) % 500 + 100 },
+        { type: 'XSS', count: hash32(`${seed}:xss`) % 300 + 50 },
+        { type: 'Bot', count: hash32(`${seed}:bot`) % 1000 + 200 }
+      ]
+    };
+  } else {
+    response.data = {
+      message: 'Endpoint operational',
+      documentation: 'https://docs.' + persona.sitekey + '.com',
+      rate_limit: hash32(`${seed}:rate`) % 1000 + 500
+    };
   }
-
-  app.get("/sitemap.xml", (req, res) => {
-    const baseUrls = resolvePublicBaseUrls(req);
-    const today = new Date().toISOString().split("T")[0];
-    const urlEntries = [];
-
-    for (const baseUrl of baseUrls) {
-      for (const pagePath of ["/", ...PUBLIC_PAGES.map((page) => page.path)]) {
-        urlEntries.push(`
-  <url><loc>${baseUrl}${pagePath}</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>${pagePath === "/" ? "1.0" : "0.7"}</priority></url>`);
-      }
-    }
-
-    res.setHeader("Cache-Control", "public, max-age=900");
-    res.type("application/xml; charset=utf-8");
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urlEntries.join("")}
-</urlset>`);
-  });
-
-  app.get("/api/v1/status", (_req, res) => {
-    const mem = process.memoryUsage();
-    res.setHeader("Cache-Control", "no-store");
-    res.json({
-      service: PUBLIC_SITE_NAME,
-      status: "operational",
-      timestamp: new Date().toISOString(),
-      uptimeSeconds: Math.floor(process.uptime()),
-      publicContent: {
-        enabled: PUBLIC_CONTENT_SURFACE,
-        rotationMode: PUBLIC_ROTATION_MODE,
-        configuredBaseUrls: parsePublicBaseUrlEntries()
-      },
-      health: {
-        turnstileReachable: Boolean(_health.ok),
-        okStreak: _health.okStreak,
-        failStreak: _health.failStreak
-      },
-      runtime: {
-        rssBytes: mem.rss,
-        heapUsedBytes: mem.heapUsed,
-        nodeVersion: process.version
-      }
-    });
-  });
-
-  addLog(`[PUBLIC-CONTENT] enabled pages=${PUBLIC_PAGES.length} rotation=${PUBLIC_ROTATION_MODE} baseUrls=${parsePublicBaseUrlEntries().length}`);
+  
+  return JSON.stringify(response, null, 2);
 }
 
-registerPublicContentRoutes();
+// ================== DUMMY SITEMAP GENERATOR ==================
+function generateEnhancedSitemap(req, persona, allPaths) {
+  const baseUrls = resolvePublicBaseUrls(req);
+  const today = new Date().toISOString().split('T')[0];
+  
+  const urlEntries = [];
+  for (const baseUrl of baseUrls) {
+    // Add all generated paths
+    allPaths.forEach(path => {
+      const priority = path === '/' ? '1.0' : 
+                      path.match(/^(p|shared|preview|embed)/) ? '0.3' : 
+                      path.match(/^(blog|articles|docs)/) ? '0.7' : '0.5';
+      
+      const changefreq = path === '/' ? 'daily' :
+                        path.includes('blog') ? 'weekly' :
+                        path.includes('docs') ? 'monthly' : 'weekly';
+      
+      urlEntries.push(`
+  <url>
+    <loc>${baseUrl}${path}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority}</priority>
+  </url>`);
+    });
+  }
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  ${urlEntries.join('')}
+</urlset>`;
+}
+
+// ================== BACKGROUND TRAFFIC GENERATOR ==================
+function startPublicBackgroundTraffic() {
+  if (!PUBLIC_ENABLE_BACKGROUND || !PUBLIC_CONTENT_SURFACE) return;
+  
+  const generateVisit = async () => {
+    try {
+      const persona = getActivePersona();
+      const allPaths = generateAllPaths(persona);
+      
+      // Pick a random path
+      const randomPath = allPaths[Math.floor(Math.random() * allPaths.length)];
+      
+      // Random user agent (mix of browsers)
+      const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      ];
+      
+      // 30% chance of being a search engine bot
+      const isBot = Math.random() < 0.3;
+      const botAgents = [
+        'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        'Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+        'Mozilla/5.0 (compatible; DuckDuckBot/1.0; +https://duckduckgo.com/duckduckbot)',
+        'Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)'
+      ];
+      
+      const ua = isBot 
+        ? botAgents[Math.floor(Math.random() * botAgents.length)]
+        : userAgents[Math.floor(Math.random() * userAgents.length)];
+      
+      // Random referrer
+      const referrers = [
+        'https://www.google.com/search?q=' + encodeURIComponent(persona.name),
+        'https://www.bing.com/search?q=' + encodeURIComponent(persona.sitekey),
+        'https://github.com/search?q=' + persona.sitekey,
+        'https://news.ycombinator.com',
+        'https://twitter.com',
+        'https://linkedin.com',
+        randomPath.includes('blog') ? 'https://www.reddit.com/r/programming' : '',
+        ''
+      ];
+      
+      const referrer = referrers[Math.floor(Math.random() * referrers.length)];
+      
+      // Make request
+      await fetch(`http://localhost:${PORT}${randomPath}`, {
+        headers: {
+          'User-Agent': ua,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          ...(referrer && { 'Referer': referrer })
+        }
+      });
+      
+      addLog(`[PUBLIC-TRAFFIC] Generated ${isBot ? 'bot' : 'human'} visit to ${randomPath} (${persona.sitekey})`);
+      
+    } catch (error) {
+      // Silent fail
+    }
+    
+    // Schedule next visit (30s - 3min)
+    const delay = 30000 + Math.random() * 150000;
+    setTimeout(generateVisit, delay);
+  };
+  
+  // Start after random delay (0-60s)
+  setTimeout(generateVisit, Math.random() * 60000);
+  addLog(`[PUBLIC-TRAFFIC] Background traffic generator started (persona: ${getActivePersona().sitekey})`);
+}
+
+// ================== REGISTER ENHANCED ROUTES ==================
+function registerEnhancedPublicRoutes() {
+  if (!PUBLIC_CONTENT_SURFACE) return;
+  
+  const persona = getActivePersona();
+  const allPaths = generateAllPaths(persona);
+  const seed = rotationSeed();
+  
+  addLog(`[PUBLIC-CONTENT] Active persona: ${persona.name} (${persona.sitekey})`);
+  addLog(`[PUBLIC-CONTENT] Generated ${allPaths.length} unique paths, rotation=${PUBLIC_ROTATION_MODE}`);
+  
+  // ===== STATIC PAGES =====
+  // Homepage
+  app.get('/', (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderEnhancedPublicPage(req, { path: '/', title: 'Home' }));
+  });
+  
+  // Register ALL generated paths
+  allPaths.forEach(path => {
+    app.get(path, (req, res) => {
+      // Determine content type
+      const ext = path.split('.').pop();
+      const wantsJson = req.headers.accept?.includes('application/json') || 
+                       path.startsWith('/api/');
+      
+      if (wantsJson || persona.contentTypes.includes('json')) {
+        // API response
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.send(generateDummyAPIResponse(path, persona, `${seed}:${path}`));
+      } else {
+        // HTML page
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        
+        const pageTitle = path.split('/').pop()
+          .replace(/-/g, ' ')
+          .replace(/^\w/, c => c.toUpperCase());
+        
+        res.send(renderEnhancedPublicPage(req, { 
+          path, 
+          title: pageTitle,
+          summary: `${persona.name} - ${pageTitle}`
+        }));
+      }
+    });
+  });
+  
+  // ===== API ENDPOINTS =====
+  persona.apiEndpoints.forEach(endpoint => {
+    app.get(endpoint, (req, res) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.send(generateDummyAPIResponse(endpoint, persona, `${seed}:${endpoint}`));
+    });
+  });
+  
+  // ===== ANALYTICS COLLECTOR =====
+  if (PUBLIC_ENABLE_ANALYTICS) {
+    app.post('/_collect', express.json({ limit: '2kb' }), (req, res) => {
+      // Silently collect analytics
+      res.status(204).end();
+    });
+    
+    app.post('/_interact', (req, res) => {
+      // Track interaction
+      res.status(204).end();
+    });
+    
+    // 1x1 transparent GIF for legacy tracking
+    app.get('/_analytics.gif', (req, res) => {
+      res.setHeader('Content-Type', 'image/gif');
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
+      res.send(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'));
+    });
+  }
+  
+  // ===== SITEMAP =====
+  app.get('/sitemap.xml', (req, res) => {
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=900');
+    res.send(generateEnhancedSitemap(req, persona, allPaths));
+  });
+  
+  // ===== ROBOTS.TXT =====
+  app.get('/robots.txt', (req, res) => {
+    const baseUrls = resolvePublicBaseUrls(req);
+    const sitemapUrl = `${baseUrls[0]}/sitemap.xml`;
+    
+    const robots = `User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/internal/
+Disallow: /_analytics
+Disallow: /_collect
+Disallow: /_interact
+
+# Sitemap location
+Sitemap: ${sitemapUrl}
+
+# Crawl settings
+Crawl-delay: 1
+
+# Special directives for specific bots
+User-agent: Googlebot
+Allow: /blog/
+Allow: /docs/
+
+User-agent: Bingbot
+Allow: /blog/
+Allow: /docs/
+
+User-agent: AhrefsBot
+Crawl-delay: 2
+
+User-agent: SemrushBot
+Crawl-delay: 2`;
+    
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(robots);
+  });
+  
+  // ===== FAVICON =====
+  app.get('/favicon.ico', (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.status(204).end();
+  });
+}
+
+// ================== INITIALIZATION ==================
+function initEnhancedPublicContent() {
+  if (!PUBLIC_CONTENT_SURFACE) return;
+  
+  // Register all routes
+  registerEnhancedPublicRoutes();
+  
+  // Start background traffic
+  startPublicBackgroundTraffic();
+}
+
+// Replace the old PUBLIC_CONTENT calls with this
+initEnhancedPublicContent();
 
 app.get("/robots.txt", (req, res) => {
   res.setHeader("Cache-Control", "public, max-age=3600");

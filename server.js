@@ -3998,11 +3998,56 @@ app.get("/api/v1/status", (req, res) => {
   }
   
   // ===== SITEMAP =====
-  app.get('/sitemap.xml', (req, res) => {
-    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=900');
-    res.send(generateEnhancedSitemap(req, persona, allPaths));
+app.get("/sitemap.xml", (req, res) => {
+  const baseUrls = resolvePublicBaseUrls(req);
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Generate ALL paths from your persona
+  const allPaths = generateAllPaths(persona);
+  
+  // Add homepage and all generated paths
+  const urlEntries = [];
+  
+  // Add all paths to sitemap
+  allPaths.forEach(path => {
+    // Skip API endpoints and analytics paths
+    if (path.startsWith('/api/') || 
+        path.startsWith('/_') || 
+        path.includes('analytics') ||
+        path.includes('collect') ||
+        path.includes('interact')) {
+      return;
+    }
+    
+    baseUrls.forEach(baseUrl => {
+      const priority = path === '/' ? '1.0' : 
+                      path.match(/^(pricing|solutions|features)/) ? '0.9' :
+                      path.match(/^(blog|articles|guides)/) ? '0.8' :
+                      path.match(/^(docs|status|security)/) ? '0.7' : '0.6';
+      
+      const changefreq = path === '/' ? 'daily' :
+                        path.includes('blog') ? 'weekly' :
+                        path.includes('docs') ? 'monthly' : 'weekly';
+      
+      urlEntries.push(`
+  <url>
+    <loc>${baseUrl}${path}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority}</priority>
+  </url>`);
+    });
   });
+  
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=900');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">${urlEntries.join('')}
+</urlset>`);
+  
+  addLog(`[SITEMAP] Generated ${urlEntries.length} URLs for ${persona.name}`);
+});
   
   // ===== ROBOTS.TXT =====
   app.get('/robots.txt', (req, res) => {

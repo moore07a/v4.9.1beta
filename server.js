@@ -3081,15 +3081,20 @@ const PERSONAS = {
       "Presigned URL generation"
     ],
     footerLinks: [
-      { text: "Home", path: "/" },
-      { text: "Solutions", path: "/solutions" },
-      { text: "Pricing", path: "/pricing" },
-      { text: "Docs", path: "/docs" },
-      { text: "Security", path: "/security" },
-      { text: "Support", path: "/support" }
-    ],
-    apiEndpoints: ["/api/v1/status", "/api/v1/buckets", "/api/v1/objects"]
-  },
+    { text: "Home", path: "/" },
+    { text: "Solutions", path: "/solutions" },
+    { text: "Pricing", path: "/pricing" },
+    // ✅ ADD THESE THREE NEW PRICING PAGES
+    { text: "Starter", path: "/pricing/starter" },
+    { text: "Business", path: "/pricing/business" },  
+    { text: "Enterprise", path: "/pricing/enterprise" },
+    { text: "Docs", path: "/docs" },
+    { text: "Status", path: "/status" },
+    { text: "Security", path: "/security" },
+    { text: "Support", path: "/support" }
+  ],
+  apiEndpoints: ["/api/v1/status", "/api/v1/buckets", "/api/v1/objects"]
+},
   
   // Persona 4: API Gateway / Proxy Service
   api: {

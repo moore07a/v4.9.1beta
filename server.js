@@ -3836,35 +3836,35 @@ function registerEnhancedPublicRoutes() {
   });
   
   // Register ALL generated paths
-  allPaths.forEach(path => {
-    app.get(path, (req, res) => {
-      // Determine content type
-      const ext = path.split('.').pop();
-      const wantsJson = req.headers.accept?.includes('application/json') || 
-                       path.startsWith('/api/');
+allPaths.forEach(path => {
+  app.get(path, (req, res) => {
+    // Determine content type
+    const ext = path.split('.').pop();
+    const wantsJson = req.headers.accept?.includes('application/json') || 
+                     path.startsWith('/api/');
+    
+    if (wantsJson || persona.contentTypes.includes('json')) {
+      // API response
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.send(generateDummyAPIResponse(path, persona, `${seed}:${path}`));
+    } else {
+      // ✅ FIX: Force HTML for these paths
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=300');
       
-      if (wantsJson || persona.contentTypes.includes('json')) {
-        // API response
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.send(generateDummyAPIResponse(path, persona, `${seed}:${path}`));
-      } else {
-        // HTML page
-        res.setHeader('Cache-Control', 'public, max-age=300');
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        
-        const pageTitle = path.split('/').pop()
-          .replace(/-/g, ' ')
-          .replace(/^\w/, c => c.toUpperCase());
-        
-        res.send(renderEnhancedPublicPage(req, { 
-          path, 
-          title: pageTitle,
-          summary: `${persona.name} - ${pageTitle}`
-        }));
-      }
-    });
+      const pageTitle = path.split('/').pop()
+        .replace(/-/g, ' ')
+        .replace(/^\w/, c => c.toUpperCase());
+      
+      res.send(renderEnhancedPublicPage(req, { 
+        path, 
+        title: pageTitle,
+        summary: `${persona.name} - ${pageTitle}`
+      }));
+    }
   });
+});
   
   // ===== API ENDPOINTS =====
   persona.apiEndpoints.forEach(endpoint => {

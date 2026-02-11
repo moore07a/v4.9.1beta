@@ -3274,6 +3274,108 @@ app.get("/favicon.ico", (_req, res) => {
   return res.status(204).end();
 });
 
+// ================== PUBLIC CONTENT HELPERS ==================
+function dayStamp(d = new Date()) {
+  return d.toISOString().slice(0, 10);
+}
+
+function weekStamp(d = new Date()) {
+  const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dayNum = dt.getUTCDay() || 7;
+  dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((dt - yearStart) / 86400000) + 1) / 7);
+  return `${dt.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function rotationSeed() {
+  if (PUBLIC_ROTATION_MODE === "weekly") return weekStamp();
+  if (PUBLIC_ROTATION_MODE === "fixed") return "fixed";
+  return dayStamp();
+}
+
+function hash32(input) {
+  const hex = crypto.createHash("sha256").update(String(input)).digest("hex").slice(0, 8);
+  return parseInt(hex, 16) >>> 0;
+}
+
+function deterministicPick(items, seed, count = 3) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const out = [];
+  const n = Math.min(Math.max(1, count), items.length);
+  const used = new Set();
+  let i = 0;
+  while (out.length < n && i < (items.length * 3)) {
+    const idx = hash32(`${seed}:${i}`) % items.length;
+    if (!used.has(idx)) {
+      used.add(idx);
+      out.push(items[idx]);
+    }
+    i += 1;
+  }
+  return out;
+}
+
+function wildcardMatches(hostname, wildcardPattern) {
+  const cleanHost = String(hostname || "").toLowerCase().split(":")[0];
+  const cleanPattern = String(wildcardPattern || "").toLowerCase().trim();
+  if (!cleanHost || !cleanPattern.startsWith("*.") || cleanPattern.length < 3) return false;
+  const suffix = cleanPattern.slice(2);
+  if (!suffix) return false;
+  if (!cleanHost.endsWith(`.${suffix}`)) return false;
+  return cleanHost !== suffix;
+}
+
+function resolvePublicBaseUrls(req) {
+  const host = String(req.get("host") || "localhost");
+  const hostNoPort = host.split(":")[0];
+  const proto = req.secure || String(req.get("x-forwarded-proto") || "").includes("https") ? "https" : "http";
+  const requestBase = `${proto}://${host}`;
+
+  const configured = parsePublicBaseUrlEntries();
+  if (configured.length === 0) {
+    return [requestBase];
+  }
+
+  const out = [];
+  for (const entry of configured) {
+    if (entry === "*") {
+      out.push(requestBase);
+      continue;
+    }
+
+    const asUrl = (() => {
+      try {
+        const value = /^https?:\/\//i.test(entry) ? entry : `https://${entry}`;
+        return new URL(value);
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!asUrl) continue;
+
+    const wildcardHost = asUrl.hostname;
+    if (wildcardHost.startsWith("*.")) {
+      if (wildcardMatches(hostNoPort, wildcardHost)) {
+        out.push(`${asUrl.protocol}//${host}`);
+      }
+      continue;
+    }
+
+    out.push(`${asUrl.protocol}//${asUrl.host}`);
+  }
+
+  return [...new Set(out.filter(Boolean))] || [requestBase];
+}
+
+function parsePublicBaseUrlEntries() {
+  return PUBLIC_SITE_BASE_URL
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 // ================== ENHANCED PUBLIC CONTENT SURFACE ==================
 // Now with traffic blending capabilities, multiple personas, and dynamic paths
 

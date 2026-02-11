@@ -3784,7 +3784,7 @@ function generateDummyAPIResponse(path, persona, seed) {
 
 // ================== DUMMY SITEMAP GENERATOR ==================
 function generateEnhancedSitemap(req, persona, allPaths) {
-  const baseUrls = resolvePublicBaseUrls(req, { requestHostOnly: true });
+  const baseUrls = resolvePublicBaseUrls(req, { requestHostOnly: true, preferConfiguredCanonical: true });
   const today = new Date().toISOString().split('T')[0];
   
   const urlEntries = [];
@@ -3999,7 +3999,7 @@ app.get("/api/v1/status", (req, res) => {
   
   // ===== SITEMAP =====
 app.get("/sitemap.xml", (req, res) => {
-  const baseUrls = resolvePublicBaseUrls(req, { requestHostOnly: true });
+  const baseUrls = resolvePublicBaseUrls(req, { requestHostOnly: true, preferConfiguredCanonical: true });
   const today = new Date().toISOString().split('T')[0];
   
   // Generate ALL paths from your persona
@@ -4051,7 +4051,7 @@ app.get("/sitemap.xml", (req, res) => {
   
   // ===== ROBOTS.TXT =====
   app.get('/robots.txt', (req, res) => {
-    const baseUrls = resolvePublicBaseUrls(req, { requestHostOnly: true });
+    const baseUrls = resolvePublicBaseUrls(req, { requestHostOnly: true, preferConfiguredCanonical: true });
     const sitemapUrl = `${baseUrls[0]}/sitemap.xml`;
     
     const robots = `User-agent: *
@@ -4462,12 +4462,33 @@ function resolvePublicBaseUrls(req, options = {}) {
   const proto = req.secure || String(req.get("x-forwarded-proto") || "").includes("https") ? "https" : "http";
   const requestBase = `${proto}://${host}`;
   const requestHostOnly = options && options.requestHostOnly === true;
+  const preferConfiguredCanonical = options && options.preferConfiguredCanonical === true;
+
+  const configured = parsePublicBaseUrlEntries();
 
   if (requestHostOnly) {
+    if (preferConfiguredCanonical) {
+      const firstConfiguredCanonical = configured
+        .map((entry) => {
+          try {
+            if (!entry || entry === "*" || entry.startsWith("*.")) return null;
+            const value = /^https?:\/\//i.test(entry) ? entry : `https://${entry}`;
+            const asUrl = new URL(value);
+            return `${asUrl.protocol}//${asUrl.host}`;
+          } catch {
+            return null;
+          }
+        })
+        .find(Boolean);
+
+      if (firstConfiguredCanonical) {
+        return [firstConfiguredCanonical];
+      }
+    }
+
     return [requestBase];
   }
 
-  const configured = parsePublicBaseUrlEntries();
   if (configured.length === 0) {
     return [requestBase];
   }

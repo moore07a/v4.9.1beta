@@ -4447,7 +4447,17 @@ function wildcardMatches(hostname, wildcardPattern) {
 }
 
 function resolvePublicBaseUrls(req, options = {}) {
-  const host = String(req.get("host") || "localhost");
+  const rawForwardedHost = String(req.get("x-forwarded-host") || "")
+    .split(",")
+    .map((part) => part.trim())
+    .find(Boolean);
+  const host = String(
+    rawForwardedHost ||
+    req.get("x-original-host") ||
+    req.get("x-host") ||
+    req.get("host") ||
+    "localhost"
+  ).trim();
   const hostNoPort = host.split(":")[0];
   const proto = req.secure || String(req.get("x-forwarded-proto") || "").includes("https") ? "https" : "http";
   const requestBase = `${proto}://${host}`;

@@ -3271,7 +3271,6 @@ function generateAllPaths(persona, rotationSeed) {
 function renderEnhancedPublicPage(req, page) {
   const persona = getActivePersona();
   const seed = `${rotationSeed()}:${persona.sitekey}:${page.path}`;
-  const nowIso = new Date().toISOString();
   
   // Generate dynamic navigation
   const navLinks = persona.footerLinks
@@ -3539,14 +3538,6 @@ function renderEnhancedPublicPage(req, page) {
             <p style="color: var(--muted); font-size: 18px; margin-bottom: 30px;">Questions? Our team is here to help.</p>
 
             <div style="margin-bottom: 30px;">
-              <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-                <div style="background: var(--primary-light); color: var(--primary); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;">📧</div>
-                <div>
-                  <div style="font-weight: 600;">Email</div>
-                  <div style="color: var(--muted);">sales@cloudvault.com</div>
-                </div>
-              </div>
-
               <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
                 <div style="background: var(--primary-light); color: var(--primary); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px;">💬</div>
                 <div>
@@ -4314,7 +4305,6 @@ GET /bucket-name/file.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...&
       </div>
       <div class="copyright">
         <p>© ${new Date().getFullYear()} ${PUBLIC_SITE_NAME || persona.name}. All rights reserved.</p>
-        <p style="font-size: 12px; margin-top: 8px;">Page generated: ${nowIso}</p>
       </div>
     </div>
   </footer>

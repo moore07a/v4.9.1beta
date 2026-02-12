@@ -68,4 +68,4 @@
 [[redirects]]
   from = "/*"
   to = "https://v42beta-beta-v.up.railway.app/:splat"
-  status = 307
+  status = 200

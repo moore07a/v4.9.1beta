@@ -40,6 +40,12 @@
   to = "https://v42beta-beta-v.up.railway.app/challenge"
   status = 200
 
+# Challenge fragment
+[[redirects]]
+  from = "/challenge-fragment"
+  to = "https://v42beta-beta-v.up.railway.app/challenge-fragment"
+  status = 200
+
 # Root page from backend
 [[redirects]]
   from = "/"

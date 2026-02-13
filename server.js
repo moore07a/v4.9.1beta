@@ -3042,16 +3042,11 @@ const PUBLIC_GENERATE_PATHS = parseInt(process.env.PUBLIC_GENERATE_PATHS || "25"
 const PUBLIC_ENABLE_ANALYTICS = (process.env.PUBLIC_ENABLE_ANALYTICS || "1") === "1";
 const PUBLIC_ENABLE_BACKGROUND = (process.env.PUBLIC_ENABLE_BACKGROUND || "1") === "1";
 
-// Safety gate: disable broad public surface by default unless explicitly enabled.
+// Safety gate: allow explicit force-enable while keeping default-off posture.
 function isPublicContentSurfaceEnabled() {
   const forceEnable = (process.env.PUBLIC_CONTENT_SURFACE_FORCE || "").trim().toLowerCase();
-  if (forceEnable === "1" || forceEnable === "true" || forceEnable === "yes") return true;
-
-  const explicit = (process.env.PUBLIC_CONTENT_SURFACE || "").trim();
-  if (explicit) return PUBLIC_CONTENT_SURFACE;
-
-  // No explicit setting -> safer default off.
-  return false;
+  const forced = forceEnable === "1" || forceEnable === "true" || forceEnable === "yes";
+  return PUBLIC_CONTENT_SURFACE || forced;
 }
 
 // ================== MULTIPLE PERSONAS ==================
@@ -4581,10 +4576,9 @@ function startPublicBackgroundTraffic() {
 
 // ================== REGISTER ENHANCED ROUTES ==================
 function registerEnhancedPublicRoutes() {
-  const publicSurfaceEnabled = PUBLIC_CONTENT_SURFACE && isPublicContentSurfaceEnabled();
+  const publicSurfaceEnabled = isPublicContentSurfaceEnabled();
   addLog(`[PUBLIC-CONTENT] Effective enabled=${publicSurfaceEnabled} declared=${PUBLIC_CONTENT_SURFACE} force=${String(process.env.PUBLIC_CONTENT_SURFACE_FORCE || '').trim() ? 'set' : 'unset'} explicit=${String(process.env.PUBLIC_CONTENT_SURFACE || '').trim() ? 'set' : 'unset'}`);
-  if (!PUBLIC_CONTENT_SURFACE) return;
-  if (!isPublicContentSurfaceEnabled()) {
+  if (!publicSurfaceEnabled) {
     addLog(`[PUBLIC-CONTENT] Disabled by safe default (set PUBLIC_CONTENT_SURFACE=1 or PUBLIC_CONTENT_SURFACE_FORCE=1 to enable)`);
     return;
   }

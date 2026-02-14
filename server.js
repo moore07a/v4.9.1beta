@@ -2904,6 +2904,7 @@ app.get("/stream-log", (req, res) => {
   } else {
     res.write(`event: reset\ndata: {"ts":${Date.now()}}\n\n`);
   }
+);
 
   for (let i = startIdx; i < LOGS.length; i++) {
     sseSend(res, LOGS[i], LOG_IDS[i]);

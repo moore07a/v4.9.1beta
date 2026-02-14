@@ -2658,6 +2658,9 @@ const {
   addLog,
   resolvePublicBaseUrls,
   rotationSeed,
+  hash32,
+  express,
+  PORT: process.env.PORT || 8080,
 });
 
 initEnhancedPublicContent();

@@ -1,5 +1,5 @@
 module.exports = function createPublicContentModule(deps) {
-  const { app, crypto, addLog, resolvePublicBaseUrls, rotationSeed } = deps;
+  const { app, crypto, addLog, resolvePublicBaseUrls, rotationSeed, hash32, express, PORT } = deps;
 
 // ================== ENHANCED PUBLIC CONTENT SURFACE ==================
 const PUBLIC_CONTENT_SURFACE = (process.env.PUBLIC_CONTENT_SURFACE || "0") === "1";
@@ -10,6 +10,7 @@ const PUBLIC_ROTATION_MODE = (process.env.PUBLIC_ROTATION_MODE || "daily").trim(
 const PUBLIC_GENERATE_PATHS = parseInt(process.env.PUBLIC_GENERATE_PATHS || "25", 10);
 const PUBLIC_ENABLE_ANALYTICS = (process.env.PUBLIC_ENABLE_ANALYTICS || "1") === "1";
 const PUBLIC_ENABLE_BACKGROUND = (process.env.PUBLIC_ENABLE_BACKGROUND || "1") === "1";
+const EFFECTIVE_PORT = PORT || process.env.PORT || 8080;
 
 // Safety gate: allow explicit force-enable while keeping default-off posture.
 function isPublicContentSurfaceEnabled() {
@@ -1828,7 +1829,7 @@ function startPublicBackgroundTraffic() {
       const referrer = referrers[Math.floor(Math.random() * referrers.length)];
       
       // Make request
-      await fetch(`http://localhost:${PORT}${randomPath}`, {
+      await fetch(`http://localhost:${EFFECTIVE_PORT}${randomPath}`, {
         headers: {
           'User-Agent': ua,
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',

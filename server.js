@@ -1142,6 +1142,11 @@ function logChallengeDebug(event, details = {}) {
   } catch {}
 }
 
+function setChallengeVerifyReason(req, reason) {
+  if (!req || typeof req !== 'object') return;
+  try { req.__challengeVerifyReason = reason || ''; } catch {}
+}
+
 const CHALLENGE_REASON_MAX_LEN = 80;
 function sanitizeChallengeReason(reason) {
   if (!reason) return "";
@@ -1178,12 +1183,14 @@ function createChallengeToken(nextEnc, req, reason) {
 function verifyChallengeToken(challengeToken, req) {
   if (!challengeToken || typeof challengeToken !== "string") {
     logChallengeDebug("token_missing_or_bad_type", { type: typeof challengeToken });
+    setChallengeVerifyReason(req, "token_missing_or_bad_type");
     return null;
   }
 
   const parts = challengeToken.split(".");
   if (parts.length !== 2) {
     logChallengeDebug("token_malformed", { parts: parts.length });
+    setChallengeVerifyReason(req, "token_malformed");
     return null;
   }
 
@@ -1198,6 +1205,7 @@ function verifyChallengeToken(challengeToken, req) {
       sigHash: safeLogValue(hashUaForToken(sig), 32),
       expectedHash: safeLogValue(hashUaForToken(expectedSig), 32)
     });
+    setChallengeVerifyReason(req, "signature_mismatch");
     return null;
   }
 
@@ -1205,6 +1213,7 @@ function verifyChallengeToken(challengeToken, req) {
     const payload = JSON.parse(Buffer.from(token, "base64url").toString());
     if (Date.now() > payload.exp) {
       logChallengeDebug("token_expired", { exp: payload.exp, now: Date.now() });
+      setChallengeVerifyReason(req, "token_expired");
       return null;
     }
 
@@ -1226,13 +1235,16 @@ function verifyChallengeToken(challengeToken, req) {
           tokenUh: safeLogValue(payload.uh || "-", 24),
           reqUh: safeLogValue(uhNow || "-", 24)
         });
+        setChallengeVerifyReason(req, "binding_mismatch");
         return null;
       }
     }
 
+    setChallengeVerifyReason(req, "");
     return payload;
   } catch (e) {
     logChallengeDebug("token_decode_error", { err: safeLogValue(e?.message || "decode_error", 120) });
+    setChallengeVerifyReason(req, "token_decode_error");
     return null;
   }
 }

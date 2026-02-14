@@ -25,7 +25,7 @@ function resolveChallengeRequest(req, res) {
   if (rawCt) {
     const payload = verifyChallengeToken(String(rawCt), req);
     if (!payload) {
-      addLog(`[CHALLENGE] Invalid or expired challenge token`);
+      addLog(`[CHALLENGE] Invalid or expired challenge token reason=${safeLogValue((req && req.__challengeVerifyReason) || "unknown", 48)}`);
       recordChallengeBypassAttempt(req, "invalid_challenge_token");
       res.status(400).send("Invalid or expired challenge link");
       return null;

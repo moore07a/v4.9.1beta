@@ -500,7 +500,7 @@ function buildChallengeHtml(encryptedData, cspNonce = '') {
 
 <!-- SINGLE SCRIPT TAG - No duplicate loading -->
 <script id="cf-turnstile-script" 
-        src="${TURNSTILE_ORIGIN}/turnstile/v0/api.js?render=explicit&onload=tsApiOnLoad"
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=tsApiOnLoad"
         async 
         defer>
 </script>
@@ -541,15 +541,25 @@ app.get("/challenge", limitChallengeView, (req, res) => {
 <body>
 <noscript>Turnstile requires JavaScript. Please enable JS and refresh.</noscript>
 <script nonce="${res.locals.cspNonce || ''}">
+  var ctValue = ${JSON.stringify(fragmentToken)};
+  var nonceValue = ${JSON.stringify(res.locals.cspNonce || "")};
+  var getUrl = "/challenge-fragment?ct=" + encodeURIComponent(ctValue) + "&nonce=" + encodeURIComponent(nonceValue);
+
   fetch("/challenge-fragment", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ ct: ${JSON.stringify(fragmentToken)}, nonce: ${JSON.stringify(res.locals.cspNonce || "")} })
+    body: JSON.stringify({ ct: ctValue, nonce: nonceValue })
   })
-    .then(function(r){ if (!r.ok) throw new Error("Failed to load"); return r.text(); })
+    .then(function(r){
+      if (r.ok) return r.text();
+      return fetch(getUrl, { method: "GET", credentials: "same-origin" }).then(function(gr){
+        if (!gr.ok) throw new Error("Failed to load");
+        return gr.text();
+      });
+    })
     .then(function(html){ document.open(); document.write(html); document.close(); })
-    .catch(function(){ document.body.innerHTML = "<p style=\\"font-family:system-ui; padding:16px; color:#ef4444\\">Failed to load challenge. Please refresh.</p>"; });
+    .catch(function(){ document.body.innerHTML = "<p style=\"font-family:system-ui; padding:16px; color:#ef4444\">Failed to load challenge. Please refresh.</p>"; });
 </script>
 </body>
 </html>`;

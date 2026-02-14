@@ -3309,6 +3309,7 @@ app.get("/r", async (req, res) => {
 app.get("/:data(*)", async (req, res) => {
   const urlPathFull = (req.originalUrl || "").slice(1);
   const cleanPath = urlPathFull.split("?")[0];
+  if (!cleanPath) return res.status(400).send("Missing data");
   return handleRedirectCore(req, res, cleanPath);
 });
 

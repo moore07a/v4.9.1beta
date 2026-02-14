@@ -2891,7 +2891,7 @@ app.get("/stream-log", (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders?.();
+  if (typeof res.flushHeaders === "function") res.flushHeaders();
 
   try { res.write(": connected\n\n"); } catch {}
 
@@ -2930,8 +2930,8 @@ app.get("/stream-log", (req, res) => {
   res.once("error", cleanup);
   res.once("finish", cleanup);
 
-  req.socket?.setTimeout?.(0);
-  req.socket?.setKeepAlive?.(true);
+  if (req.socket && typeof req.socket.setTimeout === "function") req.socket.setTimeout(0);
+  if (req.socket && typeof req.socket.setKeepAlive === "function") req.socket.setKeepAlive(true);
 });
 
 app.get("/view-log-live", (req, res) => {

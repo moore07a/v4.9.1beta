@@ -1148,7 +1148,7 @@ function createChallengeToken(nextEnc, req, reason) {
   };
   const token = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const sig = crypto
-    .createHmac("sha256", process.env.ADMIN_TOKEN)
+        .createHmac("sha256", EPHEMERAL_SECRET_EFFECTIVE)
     .update(token)
     .digest("base64url");
   return `${token}.${sig}`;
@@ -1163,7 +1163,7 @@ function verifyChallengeToken(challengeToken, req) {
   const [token, sig] = parts;
 
   const expectedSig = crypto
-    .createHmac("sha256", process.env.ADMIN_TOKEN)
+        .createHmac("sha256", EPHEMERAL_SECRET_EFFECTIVE)
     .update(token)
     .digest("base64url");
   if (sig !== expectedSig) return null;

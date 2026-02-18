@@ -6728,27 +6728,10 @@ const HEALTH_HEARTBEAT_MS = ENFORCE_HEALTH_MAX
 const HEALTH_INTERVAL_CAPPED = HEALTH_INTERVAL_RAW_MS !== HEALTH_INTERVAL_MS;
 const HEALTH_HEARTBEAT_CAPPED = HEALTH_HEARTBEAT_RAW_MS !== HEALTH_HEARTBEAT_MS;
 
-const EVENT_LOOP_LAG_WARN_MS = Math.max(100, parseInt(process.env.EVENT_LOOP_LAG_WARN_MS || "500", 10));
-const EVENT_LOOP_LAG_SAMPLE_MS = Math.max(250, parseInt(process.env.EVENT_LOOP_LAG_SAMPLE_MS || "1000", 10));
-
-function startEventLoopLagMonitor() {
-  let expected = Date.now() + EVENT_LOOP_LAG_SAMPLE_MS;
-  setInterval(() => {
-    const now = Date.now();
-    const lag = now - expected;
-    expected = now + EVENT_LOOP_LAG_SAMPLE_MS;
-
-    if (lag < EVENT_LOOP_LAG_WARN_MS) return;
-
-    const mem = process.memoryUsage();
-    const rssMb = Math.round((mem.rss / (1024 * 1024)) * 10) / 10;
-    const heapUsedMb = Math.round((mem.heapUsed / (1024 * 1024)) * 10) / 10;
-    addLog(`[HEALTH] event-loop-lag=${Math.round(lag)}ms sample=${EVENT_LOOP_LAG_SAMPLE_MS}ms rssMb=${rssMb} heapUsedMb=${heapUsedMb}`);
-  }, EVENT_LOOP_LAG_SAMPLE_MS);
-}
-
-const EVENT_LOOP_LAG_WARN_MS = Math.max(100, parseInt(process.env.EVENT_LOOP_LAG_WARN_MS || "500", 10));
-const EVENT_LOOP_LAG_SAMPLE_MS = Math.max(250, parseInt(process.env.EVENT_LOOP_LAG_SAMPLE_MS || "1000", 10));
+// Use `var` (not `const`) so accidental duplicate block merges don't crash process boot
+// with "Identifier has already been declared".
+var EVENT_LOOP_LAG_WARN_MS = Math.max(100, parseInt(process.env.EVENT_LOOP_LAG_WARN_MS || "500", 10));
+var EVENT_LOOP_LAG_SAMPLE_MS = Math.max(250, parseInt(process.env.EVENT_LOOP_LAG_SAMPLE_MS || "1000", 10));
 
 function startEventLoopLagMonitor() {
   let expected = Date.now() + EVENT_LOOP_LAG_SAMPLE_MS;

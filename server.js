@@ -5125,11 +5125,12 @@ function startPublicBackgroundTraffic() {
     total: 0,
     bot: 0,
     realBrowser: 0,
+    unknown: 0,
     errors: 0,
     lastPath: "-"
   };
 
-  function isLikelyBotRequest(req) {
+  function classifyPublicTrafficRequest(req) {
     const ua = (req.get("user-agent") || "").toLowerCase();
     const knownBotFragments = [
       "bot", "spider", "crawler", "slurp", "duckduckbot", "bingbot", "googlebot", "ahrefsbot",
@@ -5137,19 +5138,30 @@ function startPublicBackgroundTraffic() {
       "headless", "phantomjs", "scrapy"
     ];
     const isBotUa = knownBotFragments.some(fragment => ua.includes(fragment));
-    const missingSecHeaders = !req.get("sec-ch-ua") || !req.get("sec-fetch-site");
-    return isBotUa || missingSecHeaders;
+    const hasSecCHUA = !!req.get("sec-ch-ua");
+    const hasFetchSite = !!req.get("sec-fetch-site");
+    const hasFetchMode = !!req.get("sec-fetch-mode");
+
+    if (isBotUa) return "bot";
+
+    if (hasSecCHUA && hasFetchSite && hasFetchMode && ua && !ua.includes("headless")) {
+      return "realBrowser";
+    }
+
+    return "unknown";
   }
 
   function maybeLogPublicTrafficVisit(req, path) {
     stats.total += 1;
     stats.lastPath = path || "-";
-    if (isLikelyBotRequest(req)) stats.bot += 1;
-    else stats.realBrowser += 1;
+    const classification = classifyPublicTrafficRequest(req);
+    if (classification === "bot") stats.bot += 1;
+    else if (classification === "realBrowser") stats.realBrowser += 1;
+    else stats.unknown += 1;
 
     if (stats.total % PUBLIC_TRAFFIC_SUMMARY_EVERY === 0) {
       addLog(
-        `[PUBLIC-TRAFFIC] Summary total=${stats.total} Bot=${stats.bot} RealBrowser=${stats.realBrowser} errors=${stats.errors} lastPath=${safeLogValue(stats.lastPath, 80)}`
+        `[PUBLIC-TRAFFIC] Summary total=${stats.total} Bot=${stats.bot} RealBrowser=${stats.realBrowser} Unknown=${stats.unknown} errors=${stats.errors} lastPath=${safeLogValue(stats.lastPath, 80)}`
       );
     }
   }
@@ -5158,7 +5170,7 @@ function startPublicBackgroundTraffic() {
     stats.errors += 1;
     if (path) stats.lastPath = path;
     if (stats.errors % PUBLIC_TRAFFIC_SUMMARY_EVERY === 0) {
-      addLog(`[PUBLIC-TRAFFIC] Summary total=${stats.total} Bot=${stats.bot} RealBrowser=${stats.realBrowser} errors=${stats.errors} lastPath=${safeLogValue(stats.lastPath, 80)}`);
+      addLog(`[PUBLIC-TRAFFIC] Summary total=${stats.total} Bot=${stats.bot} RealBrowser=${stats.realBrowser} Unknown=${stats.unknown} errors=${stats.errors} lastPath=${safeLogValue(stats.lastPath, 80)}`);
     }
   }
 

@@ -3271,7 +3271,9 @@ function getActivePersona() {
   return PERSONAS[personaKey];
 }
 
-const PUBLIC_SITE_NAME = PUBLIC_SITE_NAME_OVERRIDE || getActivePersona().name;
+function getPublicSiteName(persona = getActivePersona()) {
+  return PUBLIC_SITE_NAME_OVERRIDE || persona.name;
+}
 
 // ================== GENERATE DUMMY PATHS ==================
 const PUBLIC_CORE_MARKETING_PATHS = [
@@ -4878,7 +4880,7 @@ GET /bucket-name/file.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...&
   <header>
     <div class="container header-content">
       <a href="/" class="logo">
-  <span>${persona.logo}</span> ${PUBLIC_SITE_NAME || persona.name}
+  <span>${persona.logo}</span> ${getPublicSiteName(persona)}
       </a>
       <nav>
         ${navLinks}
@@ -4971,7 +4973,7 @@ GET /bucket-name/file.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...&
         </div>
       </div>
       <div class="copyright">
-        <p>© ${new Date().getFullYear()} ${PUBLIC_SITE_NAME || persona.name}. All rights reserved.</p>
+        <p>© ${new Date().getFullYear()} ${getPublicSiteName(persona)}. All rights reserved.</p>
       </div>
     </div>
   </footer>
@@ -5118,8 +5120,8 @@ function startPublicBackgroundTraffic() {
   if (!PUBLIC_ENABLE_BACKGROUND || !PUBLIC_CONTENT_SURFACE) return;
   const stats = {
     total: 0,
-    bot: 0,
-    human: 0,
+    syntheticBot: 0,
+    syntheticBrowser: 0,
     errors: 0,
     lastPath: "-"
   };
@@ -5127,12 +5129,12 @@ function startPublicBackgroundTraffic() {
   function maybeLogPublicTrafficVisit(isBot, path, personaSitekey) {
     stats.total += 1;
     stats.lastPath = path || "-";
-    if (isBot) stats.bot += 1;
-    else stats.human += 1;
+    if (isBot) stats.syntheticBot += 1;
+    else stats.syntheticBrowser += 1;
 
     if (stats.total % PUBLIC_TRAFFIC_SUMMARY_EVERY === 0) {
       addLog(
-        `[PUBLIC-TRAFFIC] summary total=${stats.total} bot=${stats.bot} human=${stats.human} errors=${stats.errors} lastPath=${safeLogValue(stats.lastPath, 80)}`
+        `[PUBLIC-TRAFFIC] synthetic-summary total=${stats.total} syntheticBot=${stats.syntheticBot} syntheticBrowser=${stats.syntheticBrowser} errors=${stats.errors} lastPath=${safeLogValue(stats.lastPath, 80)}`
       );
     }
   }
@@ -5140,7 +5142,7 @@ function startPublicBackgroundTraffic() {
   function maybeLogPublicTrafficError(error) {
     stats.errors += 1;
     if (stats.errors % PUBLIC_TRAFFIC_SUMMARY_EVERY === 0) {
-      addLog(`[PUBLIC-TRAFFIC] summary errors=${stats.errors} total=${stats.total} lastPath=${safeLogValue(stats.lastPath, 80)}`);
+      addLog(`[PUBLIC-TRAFFIC] synthetic-summary errors=${stats.errors} total=${stats.total} lastPath=${safeLogValue(stats.lastPath, 80)}`);
     }
   }
   
@@ -5246,7 +5248,7 @@ app.get("/api/v1/status", (req, res) => {
   res.setHeader("Content-Type", "application/json");
   res.setHeader("Cache-Control", "no-cache");
   res.json({
-    service: PUBLIC_SITE_NAME || persona.name,
+    service: getPublicSiteName(persona),
     status: "operational",
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),

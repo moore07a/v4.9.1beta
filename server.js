@@ -5173,6 +5173,7 @@ function registerEnhancedPublicRoutes() {
   
   const persona = getActivePersona();
   const allPaths = generateAllPaths(persona, rotationSeed());
+  const publicPathSet = new Set(allPaths);
   const seed = rotationSeed();
 
   app.use((req, res, next) => {
